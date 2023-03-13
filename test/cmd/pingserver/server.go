@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -20,6 +21,14 @@ const (
 )
 
 func pingHandler(rw http.ResponseWriter, req *http.Request) {
+	tr := reflect.TypeOf(rw)
+	fmt.Printf("type %s %#v\n", tr.String(), tr)
+
+	tr = tr.Elem()
+	fmt.Printf("type %s %#v\n", tr.String(), tr)
+
+
+
 	slog.Debug("connection established", "remoteAddr", req.RemoteAddr)
 	if req.URL.Path != path {
 		slog.Info("not found", "url", req.URL)

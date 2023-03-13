@@ -3,6 +3,7 @@ package goexec
 import (
 	"debug/dwarf"
 	"fmt"
+	"strings"
 
 	"golang.org/x/exp/slog"
 )
@@ -60,6 +61,9 @@ func structMemberOffsetsFromDwarf(data *dwarf.Data) (FieldOffsets, error) {
 			reader.SkipChildren()
 			continue
 		} else {
+			if strings.Contains(typeName, "response") {
+				fmt.Printf("%#v\n", entry)
+			}
 			log.Debug("inspecting fields for struct type", "type", typeName)
 			if err := readMembers(reader, fields, expectedReturns, fieldOffsets); err != nil {
 				return nil, fmt.Errorf("reading type %q members: %w", typeName, err)

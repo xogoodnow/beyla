@@ -152,6 +152,17 @@ int uprobe_ServeHttp_return(struct pt_regs *ctx) {
 
     bpf_probe_read(&trace->status, sizeof(trace->status), (void *)(resp_ptr + status_ptr_pos));
 
+    // itab->_type->hash
+    // it's not enough getting the pointer to the rtype struct, as it might be replicated in many places
+    void *itab = GO_PARAM2(&(invocation->regs));
+    void *type_ptr;
+    bpf_probe_read(&type_ptr, sizeof(void*), (void*)(itab + 8));
+    u32 hash;
+    bpf_probe_read(&hash, sizeof(u32),(void*)(type_ptr + 16));
+    bpf_printk("itab %lx", itab);
+    bpf_printk("type %lx", type_ptr);
+    bpf_printk("hash %lx", hash);
+
     // submit the completed trace via ringbuffer
     bpf_ringbuf_submit(trace, 0);
 
