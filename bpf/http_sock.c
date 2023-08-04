@@ -9,6 +9,7 @@
 #include "ringbuf.h"
 #include "http_sock.h"
 #include "http_ssl.h"
+#include "sec.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
@@ -41,6 +42,10 @@ struct {
 SEC("kretprobe/sock_alloc")
 int BPF_KRETPROBE(kretprobe_sock_alloc, struct socket *sock) {
     u64 id = bpf_get_current_pid_tgid();
+
+    sec_event_meta_t meta = {};
+    make_sec_meta(&meta);
+    print_sec_meta(&meta);
 
     if (!valid_pid(id)) {
         return 0;
