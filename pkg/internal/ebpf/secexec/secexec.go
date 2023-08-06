@@ -1,7 +1,9 @@
 package secexec
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 
 	"github.com/cilium/ebpf"
@@ -14,8 +16,8 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/imetrics"
 )
 
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers -DBPF_DEBUG
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -type sec_event -target amd64,arm64 bpf ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -type sec_event -target amd64,arm64 bpf_debug ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers -DBPF_DEBUG
 
 type Tracer struct {
 	Cfg        *ebpfcommon.TracerConfig
@@ -23,6 +25,8 @@ type Tracer struct {
 	bpfObjects bpfObjects
 	closers    []io.Closer
 }
+
+type BPFSecEvent bpfSecEvent
 
 func logger() *slog.Logger {
 	return slog.With("component", "secexec.Tracer")
@@ -84,12 +88,19 @@ func (p *Tracer) SocketFilters() []*ebpf.Program {
 
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {
 	ebpfcommon.ForwardRingbuf(
-		p.Cfg, logger(), p.bpfObjects.Events, p.toRequestTrace,
+		p.Cfg, logger(), p.bpfObjects.Events, p.toSecEvent,
 		p.Metrics,
 		append(p.closers, &p.bpfObjects)...,
 	)(ctx, eventsChan)
 }
 
-func (p *Tracer) toRequestTrace(_ *ringbuf.Record) (any, error) {
-	return nil, nil
+func (p *Tracer) toSecEvent(record *ringbuf.Record) (any, error) {
+	var event BPFSecEvent
+
+	err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
+	if err != nil {
+		return event, err
+	}
+
+	return event, nil
 }

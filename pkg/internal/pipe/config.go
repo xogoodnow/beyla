@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/debug"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/otel"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/prom"
+	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/sec"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/imetrics"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/transform"
 )
@@ -58,6 +59,7 @@ type Config struct {
 	Traces     otel.TracesConfig     `yaml:"otel_traces_export"`
 	Prometheus prom.PrometheusConfig `yaml:"prometheus_export"`
 	Printer    debug.PrintEnabled    `yaml:"print_traces" env:"PRINT_TRACES"`
+	Security   sec.SecurityEnabled   `yaml:"security" env:"BPF_SEC"`
 
 	LogLevel string `yaml:"log_level" env:"LOG_LEVEL"`
 
@@ -80,7 +82,7 @@ func (e ConfigError) Error() string {
 }
 
 func (c *Config) validateInstrumentation() error {
-	if c.EBPF.Port == 0 && c.EBPF.Exec == "" && !c.EBPF.SystemWide && !c.EBPF.Security {
+	if c.EBPF.Port == 0 && c.EBPF.Exec == "" && !c.EBPF.SystemWide && !c.Security.Enabled() {
 		return ConfigError("missing EXECUTABLE_NAME, OPEN_PORT or SYSTEM_WIDE property")
 	}
 	if (c.EBPF.Port != 0 || c.EBPF.Exec != "") && c.EBPF.SystemWide {
@@ -99,10 +101,10 @@ func (c *Config) Validate() error {
 
 	if !c.Noop.Enabled() && !c.Printer.Enabled() &&
 		!c.Metrics.Enabled() && !c.Traces.Enabled() &&
-		!c.Prometheus.Enabled() {
+		!c.Prometheus.Enabled() && !c.Security.Enabled() {
 		return ConfigError("at least one of the following properties must be set: " +
 			"NOOP_TRACES, PRINT_TRACES, OTEL_EXPORTER_OTLP_ENDPOINT, " +
-			"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, BEYLA_PROMETHEUS_PORT")
+			"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, BEYLA_PROMETHEUS_PORT, BPF_SEC")
 	}
 	return nil
 }

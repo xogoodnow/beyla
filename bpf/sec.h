@@ -6,6 +6,10 @@
 #include "bpf_core_read.h"
 #include "pid.h"
 
+#define OP_EXECVE 1
+#define OP_EXECVEAT 2
+#define OP_EXIT 3
+
 #define CGRP_NAME_LEN 128
 #define EVENT_BUF_LEN 2048
 
@@ -25,13 +29,13 @@ typedef struct sec_event_meta {
     u64 cap_perm; // Subjective task permitted capabilities
     u32 cgrp_id;  // The cgroup_id 
     u32 net_ns;   // The network namespace 
-    char cgrp_name[CGRP_NAME_LEN]; // Cgroup name
-    char comm[16];// Current command
+    unsigned char cgrp_name[CGRP_NAME_LEN]; // Cgroup name
+    unsigned char comm[16];// Current command
 } sec_event_meta_t; 
 
 typedef struct sec_event {
     sec_event_meta_t meta;
-    char buf[EVENT_BUF_LEN]; // Whatever we capture as data
+    unsigned char buf[EVENT_BUF_LEN]; // Whatever we capture as data
 } sec_event_t;
 
 static __always_inline u64 auid(struct task_struct *task) {

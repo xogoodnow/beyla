@@ -13,6 +13,31 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpfSecEvent struct {
+	Meta struct {
+		Op       uint8
+		_        [3]byte
+		Pid      uint32
+		Tid      uint32
+		Ppid     uint32
+		Uid      uint32
+		Auid     uint32
+		NsPid    uint32
+		NsPpid   uint32
+		PidNsId  uint32
+		_        [4]byte
+		TimeNs   uint64
+		CapEff   uint64
+		CapInh   uint64
+		CapPerm  uint64
+		CgrpId   uint32
+		NetNs    uint32
+		CgrpName [128]uint8
+		Comm     [16]uint8
+	}
+	Buf [2048]uint8
+}
+
 // loadBpf returns the embedded CollectionSpec for bpf.
 func loadBpf() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_BpfBytes)

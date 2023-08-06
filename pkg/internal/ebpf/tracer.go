@@ -78,7 +78,7 @@ func TracerProvider(_ context.Context, pt *ProcessTracer) ([]node.StartFuncCtx[[
 	return pt.TraceReaders()
 }
 
-func FindAndInstrument(ctx context.Context, cfg *ebpfcommon.TracerConfig, metrics imetrics.Reporter) (*ProcessTracer, error) {
+func FindAndInstrument(ctx context.Context, cfg *ebpfcommon.TracerConfig, metrics imetrics.Reporter, security bool) (*ProcessTracer, error) {
 	var log = logger()
 
 	// Each program is an eBPF source: net/http, grpc...
@@ -105,7 +105,7 @@ func FindAndInstrument(ctx context.Context, cfg *ebpfcommon.TracerConfig, metric
 	} else {
 		// We are not instrumenting a Go application, we override the programs
 		// list with the generic kernel/socket space filters
-		if cfg.Security {
+		if security {
 			programs = []Tracer{&secexec.Tracer{Cfg: cfg, Metrics: metrics}}
 		} else {
 			programs = []Tracer{&httpfltr.Tracer{Cfg: cfg, Metrics: metrics}}

@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/debug"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/otel"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/prom"
+	"github.com/grafana/ebpf-autoinstrument/pkg/internal/export/sec"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/imetrics"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/pipe/global"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/transform"
@@ -23,13 +24,14 @@ type nodesMap struct {
 	TracerReader *ebpf.ProcessTracer `nodeId:"tracer" sendTo:"routes"`
 
 	// Routes is an optional node. If not set, data will be directly forwarded to exporters.
-	Routes *transform.RoutesConfig `nodeId:"routes" forwardTo:"otel_metrics,otel_traces,print,noop,prom"`
+	Routes *transform.RoutesConfig `nodeId:"routes" forwardTo:"otel_metrics,otel_traces,print,noop,prom,security"`
 
 	Metrics    otel.MetricsConfig    `nodeId:"otel_metrics"`
 	Traces     otel.TracesConfig     `nodeId:"otel_traces"`
 	Prometheus prom.PrometheusConfig `nodeId:"prom"`
 	Printer    debug.PrintEnabled    `nodeId:"print"`
 	Noop       debug.NoopEnabled     `nodeId:"noop"`
+	Security   sec.SecurityEnabled   `nodeId:"security"`
 }
 
 func configToNodesMap(cfg *Config, tracer *ebpf.ProcessTracer) *nodesMap {
@@ -41,6 +43,7 @@ func configToNodesMap(cfg *Config, tracer *ebpf.ProcessTracer) *nodesMap {
 		Prometheus:   cfg.Prometheus,
 		Printer:      cfg.Printer,
 		Noop:         cfg.Noop,
+		Security:     cfg.Security,
 	}
 }
 
@@ -57,6 +60,10 @@ type graphFunctions struct {
 func Build(ctx context.Context, config *Config, ctxInfo *global.ContextInfo, tracer *ebpf.ProcessTracer) (*Instrumenter, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("validating configuration: %w", err)
+	}
+
+	if config.Security {
+		return newSecurityGraphBuilder(config, ctxInfo, tracer).buildGraph(ctx)
 	}
 
 	return newGraphBuilder(config, ctxInfo, tracer).buildGraph(ctx)
@@ -90,6 +97,21 @@ func newGraphBuilder(config *Config, ctxInfo *global.ContextInfo, tracer *ebpf.P
 	// the contents of the nodesMap struct, will automagically instantiate
 	// and interconnect each node according to the "nodeId" and "sendsTo"
 	// annotations in the nodesMap struct definition
+	return gb
+}
+
+func newSecurityGraphBuilder(config *Config, ctxInfo *global.ContextInfo, tracer *ebpf.ProcessTracer) *graphFunctions {
+	gnb := graph.NewBuilder(node.ChannelBufferLen(config.ChannelBufferLen))
+	gb := &graphFunctions{
+		builder: gnb,
+		config:  config,
+		tracer:  tracer,
+		ctxInfo: ctxInfo,
+	}
+	graph.RegisterCodec(gnb, transform.ReadSecurityEvent)
+	graph.RegisterMultiStart(gnb, ebpf.TracerProvider)
+	graph.RegisterTerminal(gnb, sec.LoggerNode)
+
 	return gb
 }
 

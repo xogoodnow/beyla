@@ -11,6 +11,9 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define MAX_STR_LEN 256
 #define MAX_ARR_CNT 30
 
+// Force emitting struct sec_event_t into the ELF for automatic creation of Golang struct
+const sec_event_t *unused __attribute__((unused));
+
 #if defined(__TARGET_ARCH_arm64)
 // Copied from Linux include/uapi/asm/ptrace.h to make ARM64 happy
 struct user_pt_regs {
@@ -21,13 +24,14 @@ struct user_pt_regs {
 };
 #endif
 
-static __always_inline void execve_event(const char *filename, const char *const *argv) {
+static __always_inline void execve_event(const char *filename, const char *const *argv, u8 op) {
     sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
     if (event) {
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
-        char *b = &(event->buf[0]);
-        char *end = &(event->buf[EVENT_BUF_LEN]);
+        event->meta.op = op;
+        unsigned char *b = &(event->buf[0]);
+        unsigned char *end = &(event->buf[EVENT_BUF_LEN]);
 
         int len = bpf_probe_read_str(b, MAX_STR_LEN, filename);
         if (len > 0) {
@@ -74,14 +78,14 @@ out:
 SEC("tracepoint/syscalls/sys_enter_execve")
 int syscall_enter_execve(struct execve_args *ctx) {
     bpf_dbg_printk("=== tracepoint/syscalls/sys_enter_execve ===");
-    execve_event(ctx->filename, ctx->argv);
+    execve_event(ctx->filename, ctx->argv, OP_EXECVE);
     return 0;
 }
 
 SEC("tracepoint/syscalls/sys_enter_execveat")
 int syscall_enter_execveat(struct execveat_args *ctx) {
     bpf_dbg_printk("=== tracepoint/syscalls/sys_enter_execveat ===");
-    execve_event(ctx->filename, ctx->argv);
+    execve_event(ctx->filename, ctx->argv, OP_EXECVEAT);
     return 0;
 }
 
@@ -93,12 +97,15 @@ int BPF_KPROBE(kprobe_do_task_dead) {
     atomic_t live = BPF_CORE_READ(signal, live);
 
     if (live.counter == 0) {
-        sec_event_meta_t meta = {};
-
         bpf_dbg_printk("=== sys_exit ===");
 
-        make_sec_meta(&meta);
-        print_sec_meta(&meta);
+        sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+        if (event) {
+            make_sec_meta(&event->meta);
+            print_sec_meta(&event->meta);
+            event->meta.op = OP_EXIT;
+            bpf_ringbuf_submit(event, get_flags());
+        }
     }
 
     return 0;

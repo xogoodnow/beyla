@@ -60,7 +60,7 @@ func LoadConfig(reader io.Reader) (*Config, error) {
 func (i *Instrumenter) FindTarget(ctx context.Context) error {
 	log().Info("creating instrumentation pipeline")
 	var err error
-	i.tracer, err = ebpf.FindAndInstrument(ctx, &i.config.EBPF, i.ctxInfo.Metrics)
+	i.tracer, err = ebpf.FindAndInstrument(ctx, &i.config.EBPF, i.ctxInfo.Metrics, i.config.Security.Enabled())
 	if err != nil {
 		return fmt.Errorf("can't find an instrument executable: %w", err)
 	}
