@@ -47,7 +47,7 @@ type Tracer interface {
 	// KProbes returns a map with the name of the kernel probes that need to be
 	// tapped into. Start matches kprobe, End matches kretprobe
 	KProbes() map[string]ebpfcommon.FunctionPrograms
-	Syscalls() map[string]ebpfcommon.FunctionPrograms
+	Tracepoints() map[string]ebpfcommon.FunctionPrograms
 	// KProbes returns a map with the module name mapping to the uprobes that need to be
 	// tapped into. Start matches uprobe, End matches uretprobe
 	UProbes() map[string]map[string]ebpfcommon.FunctionPrograms
@@ -189,7 +189,7 @@ func (pt *ProcessTracer) TraceReaders() ([]node.StartFuncCtx[[]any], error) {
 		}
 
 		//Syscall tracepoints
-		if err := i.syscalls(p); err != nil {
+		if err := i.tracepoints(p); err != nil {
 			printVerifierErrorInfo(err)
 			unmountBpfPinPath(pt.pinPath)
 			return nil, err

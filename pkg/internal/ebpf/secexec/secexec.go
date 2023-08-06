@@ -56,12 +56,14 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 	return nil
 }
 
-func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
+func (p *Tracer) Tracepoints() map[string]ebpfcommon.FunctionPrograms {
 	return map[string]ebpfcommon.FunctionPrograms{
 		"sys_enter_execve": {
+			Type:  "syscalls",
 			Start: p.bpfObjects.SyscallEnterExecve,
 		},
 		"sys_enter_execveat": {
+			Type:  "syscalls",
 			Start: p.bpfObjects.SyscallEnterExecveat,
 		},
 	}

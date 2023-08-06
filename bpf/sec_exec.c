@@ -11,6 +11,8 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define MAX_STR_LEN 256
 #define MAX_ARR_CNT 30
 
+#define MAX_CONCURRENT_REQUESTS 10000
+
 // Force emitting struct sec_event_t into the ELF for automatic creation of Golang struct
 const sec_event_t *unused __attribute__((unused));
 
@@ -24,6 +26,14 @@ struct user_pt_regs {
 };
 #endif
 
+// Track PID to executable on exec, so we can report the command on exit
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(max_entries, MAX_CONCURRENT_REQUESTS);
+    __type(key, u32);
+    __type(value, char[MAX_STR_LEN]);
+} active_pids SEC(".maps");
+
 static __always_inline void execve_event(const char *filename, const char *const *argv, u8 op) {
     sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
     if (event) {
@@ -35,6 +45,11 @@ static __always_inline void execve_event(const char *filename, const char *const
 
         int len = bpf_probe_read_str(b, MAX_STR_LEN, filename);
         if (len > 0) {
+            char executable[MAX_STR_LEN];
+            bpf_probe_read_str(executable, MAX_STR_LEN, filename);
+            u32 pid = event->meta.pid;
+            bpf_map_update_elem(&active_pids, &pid, &executable, BPF_ANY); // On purpose BPF_ANY, we want to overwrite stal
+
             b += (u16)(len-1); // ignore the null terminator
         }                
 
@@ -104,6 +119,13 @@ int BPF_KPROBE(kprobe_do_task_dead) {
             make_sec_meta(&event->meta);
             print_sec_meta(&event->meta);
             event->meta.op = OP_EXIT;
+
+            u32 pid = event->meta.pid;
+            char *executable = bpf_map_lookup_elem(&active_pids, &pid);
+            if (executable) {
+                bpf_probe_read_str(event->buf, MAX_STR_LEN, executable);
+            }
+
             bpf_ringbuf_submit(event, get_flags());
         }
     }

@@ -2,13 +2,13 @@
 package sec
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"time"
+	"os"
 
-	"github.com/gavv/monotime"
 	"github.com/mariomac/pipes/pkg/node"
+	"golang.org/x/exp/slog"
 
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/transform"
 )
@@ -19,23 +19,34 @@ func (p SecurityEnabled) Enabled() bool {
 	return bool(p)
 }
 
+var log = slog.With("component", "sec.logger")
+
 func LoggerNode(_ context.Context, _ SecurityEnabled) (node.TerminalFunc[[]transform.SecurityEvent], error) {
 	return func(input <-chan []transform.SecurityEvent) {
+
+		file, err := os.OpenFile("/var/log/beyla_sec.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Error("Error opening log file:", err)
+			return
+		}
+		defer file.Close()
+
 		for events := range input {
 			for i := range events {
 				e := events[i]
-				now := time.Now()
-				monoNow := monotime.Now()
-				tsDelta := monoNow - time.Duration(e.Meta.TimeNs)
-
-				commLen := bytes.IndexByte(e.Meta.Comm[:], 0)
-				if commLen < 0 {
-					commLen = len(e.Meta.Comm)
+				jsonBytes, err := json.Marshal(e)
+				if err != nil {
+					log.Error("Error encoding JSON:", err)
+					return
 				}
-				fmt.Printf("%s comm=[%s]\n",
-					(now.Add(-tsDelta)).Format("2006-01-02 15:04:05.12345"),
-					string(e.Meta.Comm[:commLen]),
-				)
+
+				jsonBytes = append(jsonBytes, '\n')
+
+				fmt.Printf("%s\n", jsonBytes)
+				if _, err := file.Write(jsonBytes); err != nil {
+					log.Error("Error writing to log file:", err)
+					return
+				}
 			}
 		}
 	}, nil

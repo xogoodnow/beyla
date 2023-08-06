@@ -88,7 +88,8 @@ type bpf_debugProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpf_debugMapSpecs struct {
-	Events *ebpf.MapSpec `ebpf:"events"`
+	ActivePids *ebpf.MapSpec `ebpf:"active_pids"`
+	Events     *ebpf.MapSpec `ebpf:"events"`
 }
 
 // bpf_debugObjects contains all objects after they have been loaded into the kernel.
@@ -110,11 +111,13 @@ func (o *bpf_debugObjects) Close() error {
 //
 // It can be passed to loadBpf_debugObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpf_debugMaps struct {
-	Events *ebpf.Map `ebpf:"events"`
+	ActivePids *ebpf.Map `ebpf:"active_pids"`
+	Events     *ebpf.Map `ebpf:"events"`
 }
 
 func (m *bpf_debugMaps) Close() error {
 	return _Bpf_debugClose(
+		m.ActivePids,
 		m.Events,
 	)
 }

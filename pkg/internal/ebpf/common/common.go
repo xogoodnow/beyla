@@ -63,6 +63,7 @@ type FunctionPrograms struct {
 	// Required, if true, will cancel the execution of the eBPF Tracer
 	// if the function has not been found in the executable
 	Required bool
+	Type     string
 	Start    *ebpf.Program
 	End      *ebpf.Program
 }

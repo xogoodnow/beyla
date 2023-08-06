@@ -104,7 +104,7 @@ func (p *Tracer) UProbes() map[string]map[string]ebpfcommon.FunctionPrograms {
 	return nil
 }
 
-func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
+func (p *Tracer) Tracepoints() map[string]ebpfcommon.FunctionPrograms {
 	return nil
 }
 
