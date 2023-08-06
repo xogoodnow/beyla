@@ -7,6 +7,7 @@
 #include "pid.h"
 
 #define CGRP_NAME_LEN 128
+#define EVENT_BUF_LEN 2048
 
 typedef struct sec_event_meta {
     u8  op;       // Event type
@@ -30,7 +31,7 @@ typedef struct sec_event_meta {
 
 typedef struct sec_event {
     sec_event_meta_t meta;
-    char buf[2048]; // Whatever we capture as data
+    char buf[EVENT_BUF_LEN]; // Whatever we capture as data
 } sec_event_t;
 
 static __always_inline u64 auid(struct task_struct *task) {
@@ -128,8 +129,35 @@ static __always_inline void print_sec_meta(sec_event_meta_t *m) {
     bpf_printk("comm=[%s] pid=[%d] tid=[%d] ns_pid=[%d] ns_ppid=[%d] pid_ns_id=[%u] time_ns=[%lld] uid=[%d] auid=[%d] cap_perm=[%llx] cap_eff=[%llx] cap_inh=[%llx]",
         m->comm, m->pid, m->tid, m->ns_pid, m->ns_ppid, m->pid_ns_id, m->time_ns, m->uid, m->auid, m->cap_perm, m->cap_eff, m->cap_inh
     );
-    bpf_printk("cgrp_id=[%d] cgrp_name=[%s] net_ns=[%d]", m->cgrp_id, m->cgrp_name, m->net_ns);
-
+    bpf_printk("cgrp_id=[%d] cgrp_name=[%s] net_ns=[%u]", m->cgrp_id, m->cgrp_name, m->net_ns);
 }
+
+// syscall structs
+
+// Based on /sys/kernel/debug/tracing/events/syscalls/sys_enter_execve/format
+struct execve_args {
+    short common_type;
+    char common_flags;
+    char common_preempt_count;
+    int common_pid;
+    int __syscall_nr;
+    char *filename;
+    const char *const *argv;
+    const char *const *envp;
+};
+
+// Based on /sys/kernel/debug/tracing/events/syscalls/sys_enter_execveat/format
+struct execveat_args {
+    short common_type;
+    char common_flags;
+    char common_preempt_count;
+    int common_pid;
+    int __syscall_nr;
+    int fd;
+    char *filename;
+    const char *const *argv;
+    const char *const *envp;
+    int flags;
+};
 
 #endif

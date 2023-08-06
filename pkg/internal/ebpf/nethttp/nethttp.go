@@ -107,6 +107,10 @@ func (p *Tracer) SocketFilters() []*ebpf.Program {
 	return nil
 }
 
+func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
+	return nil
+}
+
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {
 	logger := slog.With("component", "nethttp.Tracer")
 	ebpfcommon.ForwardRingbuf(

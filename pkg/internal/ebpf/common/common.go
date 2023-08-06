@@ -31,6 +31,7 @@ type TracerConfig struct {
 	// No filtering per application will be done. Using this option may result in reduced quality of information
 	// gathered for certain languages, such as Golang.
 	SystemWide bool   `yaml:"system_wide" env:"SYSTEM_WIDE"`
+	Security   bool   `yaml:"security" env:"BPF_SEC"`
 	LogLevel   string `yaml:"log_level" env:"LOG_LEVEL"`
 	BpfDebug   bool   `yaml:"bfp_debug" env:"BPF_DEBUG"`
 

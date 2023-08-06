@@ -80,7 +80,7 @@ func (e ConfigError) Error() string {
 }
 
 func (c *Config) validateInstrumentation() error {
-	if c.EBPF.Port == 0 && c.EBPF.Exec == "" && !c.EBPF.SystemWide {
+	if c.EBPF.Port == 0 && c.EBPF.Exec == "" && !c.EBPF.SystemWide && !c.EBPF.Security {
 		return ConfigError("missing EXECUTABLE_NAME, OPEN_PORT or SYSTEM_WIDE property")
 	}
 	if (c.EBPF.Port != 0 || c.EBPF.Exec != "") && c.EBPF.SystemWide {

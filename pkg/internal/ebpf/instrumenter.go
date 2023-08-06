@@ -76,6 +76,31 @@ func (i *instrumenter) goprobe(probe ebpfcommon.Probe) error {
 	return nil
 }
 
+func (i *instrumenter) syscalls(p Tracer) error {
+	for sfunc, sprobes := range p.Syscalls() {
+		slog.Debug("going to add syscall", "function", sfunc, "probes", sprobes)
+
+		if err := i.syscall(sfunc, sprobes); err != nil {
+			return fmt.Errorf("instrumenting function %q: %w", sfunc, err)
+		}
+		p.AddCloser(i.closables...)
+	}
+
+	return nil
+}
+
+func (i *instrumenter) syscall(funcName string, programs ebpfcommon.FunctionPrograms) error {
+	if programs.Start != nil {
+		kp, err := link.Tracepoint("syscalls", funcName, programs.Start, nil)
+		if err != nil {
+			return fmt.Errorf("setting syscall: %w", err)
+		}
+		i.closables = append(i.closables, kp)
+	}
+
+	return nil
+}
+
 func (i *instrumenter) kprobes(p Tracer) error {
 	for kfunc, kprobes := range p.KProbes() {
 		slog.Debug("going to add kprobe to function", "function", kfunc, "probes", kprobes)

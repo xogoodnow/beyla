@@ -25,6 +25,7 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/ebpf/grpc"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/ebpf/httpfltr"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/ebpf/nethttp"
+	"github.com/grafana/ebpf-autoinstrument/pkg/internal/ebpf/secexec"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/exec"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/goexec"
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/imetrics"
@@ -46,6 +47,7 @@ type Tracer interface {
 	// KProbes returns a map with the name of the kernel probes that need to be
 	// tapped into. Start matches kprobe, End matches kretprobe
 	KProbes() map[string]ebpfcommon.FunctionPrograms
+	Syscalls() map[string]ebpfcommon.FunctionPrograms
 	// KProbes returns a map with the module name mapping to the uprobes that need to be
 	// tapped into. Start matches uprobe, End matches uretprobe
 	UProbes() map[string]map[string]ebpfcommon.FunctionPrograms
@@ -103,7 +105,11 @@ func FindAndInstrument(ctx context.Context, cfg *ebpfcommon.TracerConfig, metric
 	} else {
 		// We are not instrumenting a Go application, we override the programs
 		// list with the generic kernel/socket space filters
-		programs = []Tracer{&httpfltr.Tracer{Cfg: cfg, Metrics: metrics}}
+		if cfg.Security {
+			programs = []Tracer{&secexec.Tracer{Cfg: cfg, Metrics: metrics}}
+		} else {
+			programs = []Tracer{&httpfltr.Tracer{Cfg: cfg, Metrics: metrics}}
+		}
 	}
 
 	// Instead of the executable file in the disk, we pass the /proc/<pid>/exec
@@ -177,6 +183,13 @@ func (pt *ProcessTracer) TraceReaders() ([]node.StartFuncCtx[[]any], error) {
 
 		//Kprobes to be used for native instrumentation points
 		if err := i.kprobes(p); err != nil {
+			printVerifierErrorInfo(err)
+			unmountBpfPinPath(pt.pinPath)
+			return nil, err
+		}
+
+		//Syscall tracepoints
+		if err := i.syscalls(p); err != nil {
 			printVerifierErrorInfo(err)
 			unmountBpfPinPath(pt.pinPath)
 			return nil, err

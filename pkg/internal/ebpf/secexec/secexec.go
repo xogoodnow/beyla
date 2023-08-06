@@ -1,22 +1,11 @@
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package goruntime
+package secexec
 
 import (
 	"context"
 	"io"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/ringbuf"
 	"golang.org/x/exp/slog"
 
 	ebpfcommon "github.com/grafana/ebpf-autoinstrument/pkg/internal/ebpf/common"
@@ -25,14 +14,18 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/imetrics"
 )
 
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/go_runtime.c -- -I../../../../bpf/headers
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/go_runtime.c -- -I../../../../bpf/headers -DBPF_DEBUG
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/sec_exec.c -- -I../../../../bpf/headers -DBPF_DEBUG
 
 type Tracer struct {
 	Cfg        *ebpfcommon.TracerConfig
 	Metrics    imetrics.Reporter
 	bpfObjects bpfObjects
 	closers    []io.Closer
+}
+
+func logger() *slog.Logger {
+	return slog.With("component", "secexec.Tracer")
 }
 
 func (p *Tracer) Load() (*ebpf.CollectionSpec, error) {
@@ -44,7 +37,7 @@ func (p *Tracer) Load() (*ebpf.CollectionSpec, error) {
 }
 
 func (p *Tracer) Constants(_ *exec.FileInfo, _ *goexec.Offsets) map[string]any {
-	return make(map[string]any)
+	return nil
 }
 
 func (p *Tracer) BpfObjects() any {
@@ -56,19 +49,29 @@ func (p *Tracer) AddCloser(c ...io.Closer) {
 }
 
 func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
+	return nil
+}
+
+func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
 	return map[string]ebpfcommon.FunctionPrograms{
-		"runtime.newproc1": {
-			Start: p.bpfObjects.UprobeProcNewproc1,
-			End:   p.bpfObjects.UprobeProcNewproc1Ret,
+		"sys_enter_execve": {
+			Start: p.bpfObjects.SyscallEnterExecve,
 		},
-		"runtime.goexit1": {
-			Start: p.bpfObjects.UprobeProcGoexit1,
+		"sys_enter_execveat": {
+			Start: p.bpfObjects.SyscallEnterExecveat,
 		},
 	}
 }
 
 func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
-	return nil
+	kprobes := map[string]ebpfcommon.FunctionPrograms{
+		"do_task_dead": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeDoTaskDead,
+		},
+	}
+
+	return kprobes
 }
 
 func (p *Tracer) UProbes() map[string]map[string]ebpfcommon.FunctionPrograms {
@@ -79,15 +82,14 @@ func (p *Tracer) SocketFilters() []*ebpf.Program {
 	return nil
 }
 
-func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
-	return nil
-}
-
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {
-	logger := slog.With("component", "goruntime.Tracer")
 	ebpfcommon.ForwardRingbuf(
-		p.Cfg, logger, p.bpfObjects.Events, ebpfcommon.Read[ebpfcommon.HTTPRequestTrace],
+		p.Cfg, logger(), p.bpfObjects.Events, p.toRequestTrace,
 		p.Metrics,
 		append(p.closers, &p.bpfObjects)...,
 	)(ctx, eventsChan)
+}
+
+func (p *Tracer) toRequestTrace(_ *ringbuf.Record) (any, error) {
+	return nil, nil
 }

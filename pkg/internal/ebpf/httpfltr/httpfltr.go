@@ -87,6 +87,10 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 	return nil
 }
 
+func (p *Tracer) Syscalls() map[string]ebpfcommon.FunctionPrograms {
+	return nil
+}
+
 func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 	kprobes := map[string]ebpfcommon.FunctionPrograms{
 		// Both sys accept probes use the same kretprobe.
