@@ -5,14 +5,24 @@
 #include "bpf_helpers.h"
 #include "bpf_core_read.h"
 #include "pid.h"
+#include "http_defs.h"
 
 #define OP_EXECVE 1
 #define OP_EXECVEAT 2
 #define OP_EXIT 3
+#define OP_NET_SRV 4
+#define OP_NET_CLIENT 5
 
 #define CGRP_NAME_LEN 128
 #define EVENT_BUF_LEN 2048
 #define MAX_STR_LEN 256
+
+typedef struct connection_info {
+    u8 s_addr[IP_V6_ADDR_LEN];
+    u8 d_addr[IP_V6_ADDR_LEN];
+    u16 s_port;
+    u16 d_port;
+} connection_info_t;
 
 typedef struct sec_event_meta {
     u8  op;       // Event type
@@ -38,7 +48,10 @@ typedef struct sec_event {
     sec_event_meta_t meta;
     unsigned char filename[MAX_STR_LEN]; // the execve filename
     unsigned char buf[EVENT_BUF_LEN]; // Whatever we capture as data
+    u8 type;
+    connection_info_t conn;
 } sec_event_t;
+
 
 static __always_inline u64 auid(struct task_struct *task) {
 	if (!task) {

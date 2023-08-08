@@ -24,6 +24,7 @@
 
 // Taken from uapi/linux/in.h
 #define IPPROTO_TCP 6           /* Transmission Control Protocol */
+#define IPPROTO_UDP 17          /* User Datagram Protocol		 */
 
 // Taken from linux/include/net/tcp.h
 #define TCPHDR_FIN 0x01

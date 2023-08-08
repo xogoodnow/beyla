@@ -85,6 +85,31 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 			Required: true,
 			Start:    p.bpfObjects.KprobeSysExecveat,
 		},
+		"sys_accept": {
+			Required: true,
+			End:      p.bpfObjects.KretprobeSysAccept4,
+		},
+		"sys_accept4": {
+			Required: true,
+			End:      p.bpfObjects.KretprobeSysAccept4,
+		},
+		"sock_alloc": {
+			Required: true,
+			End:      p.bpfObjects.KretprobeSockAlloc,
+		},
+		"tcp_rcv_established": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeTcpRcvEstablished,
+		},
+		// Tracking of HTTP client calls, by tapping into connect
+		"sys_connect": {
+			Required: true,
+			End:      p.bpfObjects.KretprobeSysConnect,
+		},
+		"tcp_connect": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeTcpConnect,
+		},
 	}
 
 	return kprobes
@@ -95,7 +120,7 @@ func (p *Tracer) UProbes() map[string]map[string]ebpfcommon.FunctionPrograms {
 }
 
 func (p *Tracer) SocketFilters() []*ebpf.Program {
-	return nil
+	return []*ebpf.Program{p.bpfObjects.SocketHttpFilter}
 }
 
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {

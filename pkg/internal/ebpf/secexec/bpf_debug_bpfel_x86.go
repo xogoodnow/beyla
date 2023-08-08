@@ -13,31 +13,46 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpf_debugConnectionInfoT struct {
+	S_addr [16]uint8
+	D_addr [16]uint8
+	S_port uint16
+	D_port uint16
+}
+
 type bpf_debugSecEvent struct {
-	Meta struct {
-		Op       uint8
-		_        [3]byte
-		Pid      uint32
-		Tid      uint32
-		Ppid     uint32
-		Uid      uint32
-		Auid     uint32
-		NsPid    uint32
-		NsPpid   uint32
-		PidNsId  uint32
-		_        [4]byte
-		TimeNs   uint64
-		CapEff   uint64
-		CapInh   uint64
-		CapPerm  uint64
-		CgrpId   uint32
-		NetNs    uint32
-		CgrpName [128]uint8
-		Comm     [16]uint8
-	}
+	Meta     bpf_debugSecEventMetaT
 	Filename [256]uint8
 	Buf      [2048]uint8
+	Type     uint8
+	_        [1]byte
+	Conn     bpf_debugConnectionInfoT
+	_        [2]byte
 }
+
+type bpf_debugSecEventMetaT struct {
+	Op       uint8
+	_        [3]byte
+	Pid      uint32
+	Tid      uint32
+	Ppid     uint32
+	Uid      uint32
+	Auid     uint32
+	NsPid    uint32
+	NsPpid   uint32
+	PidNsId  uint32
+	_        [4]byte
+	TimeNs   uint64
+	CapEff   uint64
+	CapInh   uint64
+	CapPerm  uint64
+	CgrpId   uint32
+	NetNs    uint32
+	CgrpName [128]uint8
+	Comm     [16]uint8
+}
+
+type bpf_debugSockArgsT struct{ Addr uint64 }
 
 // loadBpf_debug returns the embedded CollectionSpec for bpf_debug.
 func loadBpf_debug() (*ebpf.CollectionSpec, error) {
@@ -80,19 +95,28 @@ type bpf_debugSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpf_debugProgramSpecs struct {
-	KprobeDoTaskDead     *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
-	KprobeSysExecve      *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
-	KprobeSysExecveat    *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
-	SyscallEnterExecve   *ebpf.ProgramSpec `ebpf:"syscall_enter_execve"`
-	SyscallEnterExecveat *ebpf.ProgramSpec `ebpf:"syscall_enter_execveat"`
+	KprobeDoTaskDead        *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
+	KprobeSysExecve         *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
+	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
+	KprobeTcpConnect        *ebpf.ProgramSpec `ebpf:"kprobe_tcp_connect"`
+	KprobeTcpRcvEstablished *ebpf.ProgramSpec `ebpf:"kprobe_tcp_rcv_established"`
+	KretprobeSockAlloc      *ebpf.ProgramSpec `ebpf:"kretprobe_sock_alloc"`
+	KretprobeSysAccept4     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_accept4"`
+	KretprobeSysConnect     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_connect"`
+	SocketHttpFilter        *ebpf.ProgramSpec `ebpf:"socket__http_filter"`
+	SyscallEnterExecve      *ebpf.ProgramSpec `ebpf:"syscall_enter_execve"`
+	SyscallEnterExecveat    *ebpf.ProgramSpec `ebpf:"syscall_enter_execveat"`
 }
 
 // bpf_debugMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpf_debugMapSpecs struct {
-	ActivePids *ebpf.MapSpec `ebpf:"active_pids"`
-	Events     *ebpf.MapSpec `ebpf:"events"`
+	ActiveAcceptArgs    *ebpf.MapSpec `ebpf:"active_accept_args"`
+	ActiveConnectArgs   *ebpf.MapSpec `ebpf:"active_connect_args"`
+	ActivePids          *ebpf.MapSpec `ebpf:"active_pids"`
+	Events              *ebpf.MapSpec `ebpf:"events"`
+	FilteredConnections *ebpf.MapSpec `ebpf:"filtered_connections"`
 }
 
 // bpf_debugObjects contains all objects after they have been loaded into the kernel.
@@ -114,14 +138,20 @@ func (o *bpf_debugObjects) Close() error {
 //
 // It can be passed to loadBpf_debugObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpf_debugMaps struct {
-	ActivePids *ebpf.Map `ebpf:"active_pids"`
-	Events     *ebpf.Map `ebpf:"events"`
+	ActiveAcceptArgs    *ebpf.Map `ebpf:"active_accept_args"`
+	ActiveConnectArgs   *ebpf.Map `ebpf:"active_connect_args"`
+	ActivePids          *ebpf.Map `ebpf:"active_pids"`
+	Events              *ebpf.Map `ebpf:"events"`
+	FilteredConnections *ebpf.Map `ebpf:"filtered_connections"`
 }
 
 func (m *bpf_debugMaps) Close() error {
 	return _Bpf_debugClose(
+		m.ActiveAcceptArgs,
+		m.ActiveConnectArgs,
 		m.ActivePids,
 		m.Events,
+		m.FilteredConnections,
 	)
 }
 
@@ -129,11 +159,17 @@ func (m *bpf_debugMaps) Close() error {
 //
 // It can be passed to loadBpf_debugObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpf_debugPrograms struct {
-	KprobeDoTaskDead     *ebpf.Program `ebpf:"kprobe_do_task_dead"`
-	KprobeSysExecve      *ebpf.Program `ebpf:"kprobe_sys_execve"`
-	KprobeSysExecveat    *ebpf.Program `ebpf:"kprobe_sys_execveat"`
-	SyscallEnterExecve   *ebpf.Program `ebpf:"syscall_enter_execve"`
-	SyscallEnterExecveat *ebpf.Program `ebpf:"syscall_enter_execveat"`
+	KprobeDoTaskDead        *ebpf.Program `ebpf:"kprobe_do_task_dead"`
+	KprobeSysExecve         *ebpf.Program `ebpf:"kprobe_sys_execve"`
+	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
+	KprobeTcpConnect        *ebpf.Program `ebpf:"kprobe_tcp_connect"`
+	KprobeTcpRcvEstablished *ebpf.Program `ebpf:"kprobe_tcp_rcv_established"`
+	KretprobeSockAlloc      *ebpf.Program `ebpf:"kretprobe_sock_alloc"`
+	KretprobeSysAccept4     *ebpf.Program `ebpf:"kretprobe_sys_accept4"`
+	KretprobeSysConnect     *ebpf.Program `ebpf:"kretprobe_sys_connect"`
+	SocketHttpFilter        *ebpf.Program `ebpf:"socket__http_filter"`
+	SyscallEnterExecve      *ebpf.Program `ebpf:"syscall_enter_execve"`
+	SyscallEnterExecveat    *ebpf.Program `ebpf:"syscall_enter_execveat"`
 }
 
 func (p *bpf_debugPrograms) Close() error {
@@ -141,6 +177,12 @@ func (p *bpf_debugPrograms) Close() error {
 		p.KprobeDoTaskDead,
 		p.KprobeSysExecve,
 		p.KprobeSysExecveat,
+		p.KprobeTcpConnect,
+		p.KprobeTcpRcvEstablished,
+		p.KretprobeSockAlloc,
+		p.KretprobeSysAccept4,
+		p.KretprobeSysConnect,
+		p.SocketHttpFilter,
 		p.SyscallEnterExecve,
 		p.SyscallEnterExecveat,
 	)
