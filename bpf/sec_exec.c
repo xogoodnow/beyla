@@ -103,6 +103,30 @@ int syscall_enter_execveat(struct execveat_args *ctx) {
     return 0;
 }
 
+SEC("kprobe/sys_execve")
+int kprobe_sys_execve(struct pt_regs *ctx) {
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *filename;
+    bpf_probe_read(&filename, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
+    void *argv;
+    bpf_probe_read(&argv, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+    execve_event((char *)filename, (const char *const *)argv, OP_EXECVE);
+
+    return 0;
+}
+
+SEC("kprobe/sys_execveat")
+int kprobe_sys_execveat(struct pt_regs *ctx) {
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *filename;
+    bpf_probe_read(&filename, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+    void *argv;
+    bpf_probe_read(&argv, sizeof(void *), (void *)&PT_REGS_PARM3(__ctx));
+    execve_event((char *)filename, (const char *const *)argv, OP_EXECVEAT);
+
+    return 0;
+}
+
 SEC("kprobe/do_task_dead")
 int BPF_KPROBE(kprobe_do_task_dead) {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();

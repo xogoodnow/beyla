@@ -57,7 +57,7 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 }
 
 func (p *Tracer) Tracepoints() map[string]ebpfcommon.FunctionPrograms {
-	return map[string]ebpfcommon.FunctionPrograms{
+	/*return map[string]ebpfcommon.FunctionPrograms{
 		"sys_enter_execve": {
 			Type:  "syscalls",
 			Start: p.bpfObjects.SyscallEnterExecve,
@@ -66,7 +66,9 @@ func (p *Tracer) Tracepoints() map[string]ebpfcommon.FunctionPrograms {
 			Type:  "syscalls",
 			Start: p.bpfObjects.SyscallEnterExecveat,
 		},
-	}
+	}*/
+
+	return nil
 }
 
 func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
@@ -74,6 +76,14 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 		"do_task_dead": {
 			Required: true,
 			Start:    p.bpfObjects.KprobeDoTaskDead,
+		},
+		"sys_execve": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeSysExecve,
+		},
+		"sys_execveat": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeSysExecveat,
 		},
 	}
 

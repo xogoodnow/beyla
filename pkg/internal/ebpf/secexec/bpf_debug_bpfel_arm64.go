@@ -81,6 +81,8 @@ type bpf_debugSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpf_debugProgramSpecs struct {
 	KprobeDoTaskDead     *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
+	KprobeSysExecve      *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
+	KprobeSysExecveat    *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
 	SyscallEnterExecve   *ebpf.ProgramSpec `ebpf:"syscall_enter_execve"`
 	SyscallEnterExecveat *ebpf.ProgramSpec `ebpf:"syscall_enter_execveat"`
 }
@@ -128,6 +130,8 @@ func (m *bpf_debugMaps) Close() error {
 // It can be passed to loadBpf_debugObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpf_debugPrograms struct {
 	KprobeDoTaskDead     *ebpf.Program `ebpf:"kprobe_do_task_dead"`
+	KprobeSysExecve      *ebpf.Program `ebpf:"kprobe_sys_execve"`
+	KprobeSysExecveat    *ebpf.Program `ebpf:"kprobe_sys_execveat"`
 	SyscallEnterExecve   *ebpf.Program `ebpf:"syscall_enter_execve"`
 	SyscallEnterExecveat *ebpf.Program `ebpf:"syscall_enter_execveat"`
 }
@@ -135,6 +139,8 @@ type bpf_debugPrograms struct {
 func (p *bpf_debugPrograms) Close() error {
 	return _Bpf_debugClose(
 		p.KprobeDoTaskDead,
+		p.KprobeSysExecve,
+		p.KprobeSysExecveat,
 		p.SyscallEnterExecve,
 		p.SyscallEnterExecveat,
 	)
