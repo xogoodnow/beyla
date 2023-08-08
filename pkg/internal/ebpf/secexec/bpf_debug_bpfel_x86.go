@@ -35,7 +35,8 @@ type bpf_debugSecEvent struct {
 		CgrpName [128]uint8
 		Comm     [16]uint8
 	}
-	Buf [2048]uint8
+	Filename [256]uint8
+	Buf      [2048]uint8
 }
 
 // loadBpf_debug returns the embedded CollectionSpec for bpf_debug.

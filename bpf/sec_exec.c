@@ -8,7 +8,6 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-#define MAX_STR_LEN 256
 #define MAX_ARR_CNT 30
 
 #define MAX_CONCURRENT_REQUESTS 10000
@@ -43,14 +42,12 @@ static __always_inline void execve_event(const char *filename, const char *const
         unsigned char *b = &(event->buf[0]);
         unsigned char *end = &(event->buf[EVENT_BUF_LEN]);
 
-        int len = bpf_probe_read_str(b, MAX_STR_LEN, filename);
+        int len = bpf_probe_read_str(event->filename, MAX_STR_LEN, filename);
         if (len > 0) {
             char executable[MAX_STR_LEN];
             bpf_probe_read_str(executable, MAX_STR_LEN, filename);
             u32 pid = event->meta.pid;
             bpf_map_update_elem(&active_pids, &pid, &executable, BPF_ANY); // On purpose BPF_ANY, we want to overwrite stal
-
-            b += (u16)(len-1); // ignore the null terminator
         }                
 
         #pragma unroll
@@ -68,7 +65,9 @@ static __always_inline void execve_event(const char *filename, const char *const
                 goto out;
             }
 
-            *(b++) = ' ';
+            if (b != event->buf) {
+                *(b++) = ' ';
+            }
 
             if ((b + MAX_STR_LEN) > end) {
                 goto out;

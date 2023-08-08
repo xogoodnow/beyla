@@ -12,6 +12,7 @@
 
 #define CGRP_NAME_LEN 128
 #define EVENT_BUF_LEN 2048
+#define MAX_STR_LEN 256
 
 typedef struct sec_event_meta {
     u8  op;       // Event type
@@ -35,6 +36,7 @@ typedef struct sec_event_meta {
 
 typedef struct sec_event {
     sec_event_meta_t meta;
+    unsigned char filename[MAX_STR_LEN]; // the execve filename
     unsigned char buf[EVENT_BUF_LEN]; // Whatever we capture as data
 } sec_event_t;
 

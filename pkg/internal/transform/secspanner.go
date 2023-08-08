@@ -27,6 +27,7 @@ type SecurityEvent struct {
 	NetNs    uint32    `json:"network_namespace_id"`
 	CgrpName string    `json:"cgroup_name"`
 	Comm     string    `json:"command"`
+	Filename string    `json:"filename"`
 	Buf      string    `json:"payload"`
 }
 
@@ -90,6 +91,7 @@ func toSecEvent(e *secexec.BPFSecEvent) SecurityEvent {
 		NetNs:    e.Meta.NetNs,
 		CgrpName: cStrToString(e.Meta.CgrpName[:]),
 		Comm:     cStrToString(e.Meta.Comm[:]),
+		Filename: cStrToString(e.Filename[:]),
 		Buf:      cStrToString(e.Buf[:]),
 	}
 
