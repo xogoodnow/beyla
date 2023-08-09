@@ -100,6 +100,7 @@ type bpfProgramSpecs struct {
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
 	KprobeTcpConnect        *ebpf.ProgramSpec `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.ProgramSpec `ebpf:"kprobe_tcp_rcv_established"`
+	KprobeWakeUpNewTask     *ebpf.ProgramSpec `ebpf:"kprobe_wake_up_new_task"`
 	KretprobeSockAlloc      *ebpf.ProgramSpec `ebpf:"kretprobe_sock_alloc"`
 	KretprobeSysAccept4     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_accept4"`
 	KretprobeSysConnect     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_connect"`
@@ -164,6 +165,7 @@ type bpfPrograms struct {
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
 	KprobeTcpConnect        *ebpf.Program `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.Program `ebpf:"kprobe_tcp_rcv_established"`
+	KprobeWakeUpNewTask     *ebpf.Program `ebpf:"kprobe_wake_up_new_task"`
 	KretprobeSockAlloc      *ebpf.Program `ebpf:"kretprobe_sock_alloc"`
 	KretprobeSysAccept4     *ebpf.Program `ebpf:"kretprobe_sys_accept4"`
 	KretprobeSysConnect     *ebpf.Program `ebpf:"kretprobe_sys_connect"`
@@ -179,6 +181,7 @@ func (p *bpfPrograms) Close() error {
 		p.KprobeSysExecveat,
 		p.KprobeTcpConnect,
 		p.KprobeTcpRcvEstablished,
+		p.KprobeWakeUpNewTask,
 		p.KretprobeSockAlloc,
 		p.KretprobeSysAccept4,
 		p.KretprobeSysConnect,

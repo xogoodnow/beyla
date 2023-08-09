@@ -77,6 +77,10 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 			Required: true,
 			Start:    p.bpfObjects.KprobeDoTaskDead,
 		},
+		"wake_up_new_task": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeWakeUpNewTask,
+		},
 		"sys_execve": {
 			Required: true,
 			Start:    p.bpfObjects.KprobeSysExecve,

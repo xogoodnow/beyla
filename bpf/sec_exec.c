@@ -180,6 +180,55 @@ int BPF_KPROBE(kprobe_do_task_dead) {
     return 0;
 }
 
+
+SEC("kprobe/wake_up_new_task")
+int BPF_KPROBE(kprobe_wake_up_new_task) {
+    bpf_dbg_printk("=== sys_fork ===");
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_FORK;
+
+        //event->meta.pid = parent->pid;
+        u32 pid = event->meta.pid;
+        char *executable = bpf_map_lookup_elem(&active_pids, &pid);
+        if (executable) {
+            bpf_probe_read_str(event->buf, MAX_STR_LEN, executable);
+        }
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+/*
+SEC("raw_tracepoint/sched_process_fork")
+int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
+{
+    // Note: we don't place should_trace() here so we can keep track of the cgroups in the system
+    struct task_struct *parent = (struct task_struct*)ctx->args[0];
+    //struct task_struct *child = (struct task_struct*)ctx->args[1];
+
+    bpf_dbg_printk("=== sys_fork ===");
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_FORK;
+
+        event->meta.pid = parent->pid;
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+*/
+
 SEC("socket/http_filter")
 int socket__http_filter(struct __sk_buff *skb) {
     protocol_info_t proto = {};

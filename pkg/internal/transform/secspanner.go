@@ -73,6 +73,10 @@ func opName(op uint8) string {
 		return "OP_NET_SERVER"
 	case 5:
 		return "OP_NET_CLIENT"
+	case 6:
+		return "OP_FORK"
+	case 7:
+		return "OP_RENAME"
 	}
 
 	return "OP_UNKNOWN"
