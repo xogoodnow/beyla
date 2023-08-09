@@ -243,8 +243,53 @@ int kprobe_sys_renameat(struct pt_regs *ctx) {
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
         event->meta.op = OP_RENAMEAT;
+        
         bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
         bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_unlink")
+int kprobe_sys_unlink(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_unlink ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *path;
+    bpf_probe_read(&path, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_UNLINK;
+
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, path);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_unlinkat")
+int kprobe_sys_unlinkat(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_unlinkat ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *path;
+    bpf_probe_read(&path, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_UNLINKAT;
+
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, path);
 
         bpf_ringbuf_submit(event, get_flags());
     }

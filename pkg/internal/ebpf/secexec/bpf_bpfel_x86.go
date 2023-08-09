@@ -100,6 +100,8 @@ type bpfProgramSpecs struct {
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
 	KprobeSysRename         *ebpf.ProgramSpec `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_renameat"`
+	KprobeSysUnlink         *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlink"`
+	KprobeSysUnlinkat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlinkat"`
 	KprobeTcpConnect        *ebpf.ProgramSpec `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.ProgramSpec `ebpf:"kprobe_tcp_rcv_established"`
 	KprobeWakeUpNewTask     *ebpf.ProgramSpec `ebpf:"kprobe_wake_up_new_task"`
@@ -167,6 +169,8 @@ type bpfPrograms struct {
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
 	KprobeSysRename         *ebpf.Program `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.Program `ebpf:"kprobe_sys_renameat"`
+	KprobeSysUnlink         *ebpf.Program `ebpf:"kprobe_sys_unlink"`
+	KprobeSysUnlinkat       *ebpf.Program `ebpf:"kprobe_sys_unlinkat"`
 	KprobeTcpConnect        *ebpf.Program `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.Program `ebpf:"kprobe_tcp_rcv_established"`
 	KprobeWakeUpNewTask     *ebpf.Program `ebpf:"kprobe_wake_up_new_task"`
@@ -185,6 +189,8 @@ func (p *bpfPrograms) Close() error {
 		p.KprobeSysExecveat,
 		p.KprobeSysRename,
 		p.KprobeSysRenameat,
+		p.KprobeSysUnlink,
+		p.KprobeSysUnlinkat,
 		p.KprobeTcpConnect,
 		p.KprobeTcpRcvEstablished,
 		p.KprobeWakeUpNewTask,

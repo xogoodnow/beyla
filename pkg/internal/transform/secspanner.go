@@ -79,6 +79,10 @@ func opName(op uint8) string {
 		return "OP_RENAME"
 	case 8:
 		return "OP_RENAMEAT"
+	case 9:
+		return "UNLINK"
+	case 10:
+		return "UNLINKAT"
 	}
 
 	return "OP_UNKNOWN"
