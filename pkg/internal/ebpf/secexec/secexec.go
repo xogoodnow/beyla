@@ -140,8 +140,7 @@ func (p *Tracer) UProbes() map[string]map[string]ebpfcommon.FunctionPrograms {
 }
 
 func (p *Tracer) SocketFilters() []*ebpf.Program {
-	return nil
-	//return []*ebpf.Program{p.bpfObjects.SocketHttpFilter}
+	return []*ebpf.Program{p.bpfObjects.SocketHttpFilter}
 }
 
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {

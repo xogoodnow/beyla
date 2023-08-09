@@ -31,7 +31,7 @@ type nodesMap struct {
 	Prometheus prom.PrometheusConfig `nodeId:"prom"`
 	Printer    debug.PrintEnabled    `nodeId:"print"`
 	Noop       debug.NoopEnabled     `nodeId:"noop"`
-	Security   sec.SecurityEnabled   `nodeId:"security"`
+	Security   sec.SecurityConfig    `nodeId:"security"`
 }
 
 func configToNodesMap(cfg *Config, tracer *ebpf.ProcessTracer) *nodesMap {
@@ -62,7 +62,7 @@ func Build(ctx context.Context, config *Config, ctxInfo *global.ContextInfo, tra
 		return nil, fmt.Errorf("validating configuration: %w", err)
 	}
 
-	if config.Security {
+	if config.Security.SecEnabled {
 		return newSecurityGraphBuilder(config, ctxInfo, tracer).buildGraph(ctx)
 	}
 
@@ -110,7 +110,7 @@ func newSecurityGraphBuilder(config *Config, ctxInfo *global.ContextInfo, tracer
 	}
 	graph.RegisterCodec(gnb, transform.ReadSecurityEvent)
 	graph.RegisterMultiStart(gnb, ebpf.TracerProvider)
-	graph.RegisterTerminal(gnb, sec.LoggerNode)
+	graph.RegisterTerminal(gnb, gb.securityLoggerProvider)
 
 	return gb
 }
@@ -157,4 +157,9 @@ func (gb *graphFunctions) metricsReporterProvider(ctx context.Context, config ot
 //nolint:gocritic
 func (gb *graphFunctions) prometheusProvider(ctx context.Context, config prom.PrometheusConfig) (node.TerminalFunc[[]transform.HTTPRequestSpan], error) {
 	return prom.PrometheusEndpoint(ctx, &config, gb.ctxInfo)
+}
+
+//nolint:gocritic
+func (gb *graphFunctions) securityLoggerProvider(ctx context.Context, config sec.SecurityConfig) (node.TerminalFunc[[]transform.SecurityEvent], error) {
+	return sec.SecurityLoggerNode(ctx, config)
 }

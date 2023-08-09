@@ -47,6 +47,10 @@ var defaultConfig = Config{
 			Path: "/internal/metrics",
 		},
 	},
+	Security: sec.SecurityConfig{
+		SecEnabled: false,
+		SecLogPath: "./beyla_sec.log",
+	},
 }
 
 type Config struct {
@@ -59,7 +63,7 @@ type Config struct {
 	Traces     otel.TracesConfig     `yaml:"otel_traces_export"`
 	Prometheus prom.PrometheusConfig `yaml:"prometheus_export"`
 	Printer    debug.PrintEnabled    `yaml:"print_traces" env:"PRINT_TRACES"`
-	Security   sec.SecurityEnabled   `yaml:"security" env:"BPF_SEC"`
+	Security   sec.SecurityConfig    `yaml:"security"`
 
 	LogLevel string `yaml:"log_level" env:"LOG_LEVEL"`
 

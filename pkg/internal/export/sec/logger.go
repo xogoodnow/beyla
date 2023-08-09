@@ -13,18 +13,21 @@ import (
 	"github.com/grafana/ebpf-autoinstrument/pkg/internal/transform"
 )
 
-type SecurityEnabled bool
+type SecurityConfig struct {
+	SecEnabled bool   `yaml:"sec_enabled" env:"BPF_SEC"`
+	SecLogPath string `yaml:"log_path" env:"BPF_SEC_LOG"`
+}
 
-func (p SecurityEnabled) Enabled() bool {
-	return bool(p)
+func (p SecurityConfig) Enabled() bool {
+	return true
 }
 
 var log = slog.With("component", "sec.logger")
 
-func LoggerNode(_ context.Context, _ SecurityEnabled) (node.TerminalFunc[[]transform.SecurityEvent], error) {
+func SecurityLoggerNode(_ context.Context, config SecurityConfig) (node.TerminalFunc[[]transform.SecurityEvent], error) {
 	return func(input <-chan []transform.SecurityEvent) {
 
-		file, err := os.OpenFile("/var/log/beyla_sec.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(config.SecLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Error("Error opening log file:", err)
 			return
