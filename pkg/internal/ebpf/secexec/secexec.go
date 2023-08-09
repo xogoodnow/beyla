@@ -77,6 +77,10 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 			Required: true,
 			Start:    p.bpfObjects.KprobeDoTaskDead,
 		},
+		"wake_up_new_task": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeWakeUpNewTask,
+		},
 		"sys_execve": {
 			Required: true,
 			Start:    p.bpfObjects.KprobeSysExecve,
@@ -92,6 +96,22 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 		"sys_accept4": {
 			Required: true,
 			End:      p.bpfObjects.KretprobeSysAccept4,
+		},
+		"sys_rename": {
+			Required: true,
+			End:      p.bpfObjects.KprobeSysRename,
+		},
+		"sys_renameat": {
+			Required: true,
+			End:      p.bpfObjects.KprobeSysRenameat,
+		},
+		"sys_unlink": {
+			Required: true,
+			End:      p.bpfObjects.KprobeSysUnlink,
+		},
+		"sys_unlinkat": {
+			Required: true,
+			End:      p.bpfObjects.KprobeSysUnlinkat,
 		},
 		"sock_alloc": {
 			Required: true,

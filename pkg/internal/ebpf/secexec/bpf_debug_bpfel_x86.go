@@ -98,8 +98,13 @@ type bpf_debugProgramSpecs struct {
 	KprobeDoTaskDead        *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
 	KprobeSysExecve         *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
+	KprobeSysRename         *ebpf.ProgramSpec `ebpf:"kprobe_sys_rename"`
+	KprobeSysRenameat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_renameat"`
+	KprobeSysUnlink         *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlink"`
+	KprobeSysUnlinkat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlinkat"`
 	KprobeTcpConnect        *ebpf.ProgramSpec `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.ProgramSpec `ebpf:"kprobe_tcp_rcv_established"`
+	KprobeWakeUpNewTask     *ebpf.ProgramSpec `ebpf:"kprobe_wake_up_new_task"`
 	KretprobeSockAlloc      *ebpf.ProgramSpec `ebpf:"kretprobe_sock_alloc"`
 	KretprobeSysAccept4     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_accept4"`
 	KretprobeSysConnect     *ebpf.ProgramSpec `ebpf:"kretprobe_sys_connect"`
@@ -162,8 +167,13 @@ type bpf_debugPrograms struct {
 	KprobeDoTaskDead        *ebpf.Program `ebpf:"kprobe_do_task_dead"`
 	KprobeSysExecve         *ebpf.Program `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
+	KprobeSysRename         *ebpf.Program `ebpf:"kprobe_sys_rename"`
+	KprobeSysRenameat       *ebpf.Program `ebpf:"kprobe_sys_renameat"`
+	KprobeSysUnlink         *ebpf.Program `ebpf:"kprobe_sys_unlink"`
+	KprobeSysUnlinkat       *ebpf.Program `ebpf:"kprobe_sys_unlinkat"`
 	KprobeTcpConnect        *ebpf.Program `ebpf:"kprobe_tcp_connect"`
 	KprobeTcpRcvEstablished *ebpf.Program `ebpf:"kprobe_tcp_rcv_established"`
+	KprobeWakeUpNewTask     *ebpf.Program `ebpf:"kprobe_wake_up_new_task"`
 	KretprobeSockAlloc      *ebpf.Program `ebpf:"kretprobe_sock_alloc"`
 	KretprobeSysAccept4     *ebpf.Program `ebpf:"kretprobe_sys_accept4"`
 	KretprobeSysConnect     *ebpf.Program `ebpf:"kretprobe_sys_connect"`
@@ -177,8 +187,13 @@ func (p *bpf_debugPrograms) Close() error {
 		p.KprobeDoTaskDead,
 		p.KprobeSysExecve,
 		p.KprobeSysExecveat,
+		p.KprobeSysRename,
+		p.KprobeSysRenameat,
+		p.KprobeSysUnlink,
+		p.KprobeSysUnlinkat,
 		p.KprobeTcpConnect,
 		p.KprobeTcpRcvEstablished,
+		p.KprobeWakeUpNewTask,
 		p.KretprobeSockAlloc,
 		p.KretprobeSysAccept4,
 		p.KretprobeSysConnect,

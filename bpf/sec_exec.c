@@ -180,6 +180,123 @@ int BPF_KPROBE(kprobe_do_task_dead) {
     return 0;
 }
 
+
+SEC("kprobe/wake_up_new_task")
+int BPF_KPROBE(kprobe_wake_up_new_task) {
+    bpf_dbg_printk("=== sys_fork ===");
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_FORK;
+
+        u32 pid = event->meta.pid;
+        char *executable = bpf_map_lookup_elem(&active_pids, &pid);
+        if (executable) {
+            bpf_probe_read_str(event->buf, MAX_STR_LEN, executable);
+        }
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_rename")
+int kprobe_sys_rename(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_rename ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *oldpath;
+    void *newpath;
+    bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
+    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_RENAME;
+
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
+        bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_renameat")
+int kprobe_sys_renameat(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_renameat ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *oldpath;
+    void *newpath;
+    bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM4(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_RENAMEAT;
+        
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
+        bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_unlink")
+int kprobe_sys_unlink(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_unlink ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *path;
+    bpf_probe_read(&path, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_UNLINK;
+
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, path);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
+SEC("kprobe/sys_unlinkat")
+int kprobe_sys_unlinkat(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_unlinkat ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *path;
+    bpf_probe_read(&path, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_UNLINKAT;
+
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, path);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
+
 SEC("socket/http_filter")
 int socket__http_filter(struct __sk_buff *skb) {
     protocol_info_t proto = {};
