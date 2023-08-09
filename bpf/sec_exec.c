@@ -229,7 +229,7 @@ int kprobe_sys_renameat(struct pt_regs *ctx) {
         bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
         bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
 
-        bpf_printk("oldpath = %s, newpath = %s", event->filename, event->buf);
+        bpf_dbg_printk("oldpath = %s, newpath = %s", event->filename, event->buf);
 
         bpf_ringbuf_submit(event, get_flags());
     }
