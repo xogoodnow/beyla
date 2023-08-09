@@ -97,6 +97,10 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 			Required: true,
 			End:      p.bpfObjects.KretprobeSysAccept4,
 		},
+		"sys_renameat": {
+			Required: true,
+			End:      p.bpfObjects.KprobeSysRenameat,
+		},
 		"sock_alloc": {
 			Required: true,
 			End:      p.bpfObjects.KretprobeSockAlloc,

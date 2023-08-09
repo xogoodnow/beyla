@@ -191,7 +191,6 @@ int BPF_KPROBE(kprobe_wake_up_new_task) {
         print_sec_meta(&event->meta);
         event->meta.op = OP_FORK;
 
-        //event->meta.pid = parent->pid;
         u32 pid = event->meta.pid;
         char *executable = bpf_map_lookup_elem(&active_pids, &pid);
         if (executable) {
@@ -204,30 +203,54 @@ int BPF_KPROBE(kprobe_wake_up_new_task) {
     return 0;
 }
 
-/*
-SEC("raw_tracepoint/sched_process_fork")
-int tracepoint__sched__sched_process_fork(struct bpf_raw_tracepoint_args *ctx)
-{
-    // Note: we don't place should_trace() here so we can keep track of the cgroups in the system
-    struct task_struct *parent = (struct task_struct*)ctx->args[0];
-    //struct task_struct *child = (struct task_struct*)ctx->args[1];
+SEC("kprobe/sys_rename")
+int kprobe_sys_rename(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_rename ===");
 
-    bpf_dbg_printk("=== sys_fork ===");
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *oldpath;
+    void *newpath;
+    bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
+    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
 
     sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
     if (event) {
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
-        event->meta.op = OP_FORK;
+        event->meta.op = OP_RENAME;
 
-        event->meta.pid = parent->pid;
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
+        bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
 
         bpf_ringbuf_submit(event, get_flags());
     }
 
     return 0;
 }
-*/
+
+SEC("kprobe/sys_renameat")
+int kprobe_sys_renameat(struct pt_regs *ctx) {
+    bpf_dbg_printk("=== sys_renameat ===");
+
+    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
+    void *oldpath;
+    void *newpath;
+    bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
+    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM4(__ctx));
+
+    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
+    if (event) {
+        make_sec_meta(&event->meta);
+        print_sec_meta(&event->meta);
+        event->meta.op = OP_RENAMEAT;
+        bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
+        bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
+
+        bpf_ringbuf_submit(event, get_flags());
+    }
+
+    return 0;
+}
 
 SEC("socket/http_filter")
 int socket__http_filter(struct __sk_buff *skb) {

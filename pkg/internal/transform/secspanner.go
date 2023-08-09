@@ -77,6 +77,8 @@ func opName(op uint8) string {
 		return "OP_FORK"
 	case 7:
 		return "OP_RENAME"
+	case 8:
+		return "OP_RENAMEAT"
 	}
 
 	return "OP_UNKNOWN"

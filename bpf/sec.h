@@ -13,6 +13,8 @@
 #define OP_NET_SRV 4
 #define OP_NET_CLIENT 5
 #define OP_FORK 6
+#define OP_RENAME 7
+#define OP_RENAMEAT 8
 
 #define CGRP_NAME_LEN 128
 #define EVENT_BUF_LEN 2048
