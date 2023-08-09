@@ -31,10 +31,10 @@ type SecurityEvent struct {
 	Filename   string    `json:"filename"`
 	Buf        string    `json:"payload"`
 	Type       int       `json:"protocol"`
-	Source     string    `json:"source"`
-	SourcePort uint32    `json:"source_port"`
-	Dest       string    `json:"destination"`
-	DestPort   uint32    `json:"destination_port"`
+	LocalIP    string    `json:"local_ip"`
+	LocalPort  uint32    `json:"local_port"`
+	RemoteIP   string    `json:"remote_ip"`
+	RemotePort uint32    `json:"remote_port"`
 }
 
 func ReadSecurityEvent(in <-chan []interface{}, out chan<- []SecurityEvent) {
@@ -135,8 +135,8 @@ func toSecNetEvent(e *secexec.BPFSecEvent) SecurityEvent {
 	srcPort := e.Conn.S_port
 	dstPort := e.Conn.D_port
 
-	if (e.Conn.S_port < e.Conn.D_port && e.Meta.Op == 5) || // client call but we sorted the ips
-		(e.Conn.D_port > e.Conn.S_port && e.Meta.Op == 4) { // server call but we sorted the ips
+	if (e.Meta.Op == 4 && dstPort > srcPort) ||
+		(e.Meta.Op == 5 && srcPort < dstPort) { // server call but we sorted the ips
 		tmp := src
 		src = dst
 		dst = tmp
@@ -165,10 +165,10 @@ func toSecNetEvent(e *secexec.BPFSecEvent) SecurityEvent {
 		CgrpName:   cStrToString(e.Meta.CgrpName[:]),
 		Comm:       cStrToString(e.Meta.Comm[:]),
 		Type:       int(e.Type),
-		Source:     src.String(),
-		Dest:       dst.String(),
-		SourcePort: uint32(srcPort),
-		DestPort:   uint32(dstPort),
+		LocalIP:    src.String(),
+		RemoteIP:   dst.String(),
+		LocalPort:  uint32(srcPort),
+		RemotePort: uint32(dstPort),
 	}
 
 	return r

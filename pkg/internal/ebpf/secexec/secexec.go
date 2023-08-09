@@ -97,21 +97,21 @@ func (p *Tracer) KProbes() map[string]ebpfcommon.FunctionPrograms {
 			Required: true,
 			End:      p.bpfObjects.KretprobeSysAccept4,
 		},
-		"sys_rename": {
-			Required: true,
-			End:      p.bpfObjects.KprobeSysRename,
-		},
 		"sys_renameat": {
 			Required: true,
-			End:      p.bpfObjects.KprobeSysRenameat,
+			Start:    p.bpfObjects.KprobeSysRenameat,
+		},
+		"sys_renameat2": {
+			Required: true,
+			Start:    p.bpfObjects.KprobeSysRenameat,
 		},
 		"sys_unlink": {
 			Required: true,
-			End:      p.bpfObjects.KprobeSysUnlink,
+			Start:    p.bpfObjects.KprobeSysUnlink,
 		},
 		"sys_unlinkat": {
 			Required: true,
-			End:      p.bpfObjects.KprobeSysUnlinkat,
+			Start:    p.bpfObjects.KprobeSysUnlinkat,
 		},
 		"sock_alloc": {
 			Required: true,
@@ -140,7 +140,8 @@ func (p *Tracer) UProbes() map[string]map[string]ebpfcommon.FunctionPrograms {
 }
 
 func (p *Tracer) SocketFilters() []*ebpf.Program {
-	return []*ebpf.Program{p.bpfObjects.SocketHttpFilter}
+	return nil
+	//return []*ebpf.Program{p.bpfObjects.SocketHttpFilter}
 }
 
 func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []any) {

@@ -203,30 +203,12 @@ int BPF_KPROBE(kprobe_wake_up_new_task) {
     return 0;
 }
 
-SEC("kprobe/sys_rename")
-int kprobe_sys_rename(struct pt_regs *ctx) {
-    bpf_dbg_printk("=== sys_rename ===");
+#if defined(bpf_target_x86)
+#define KERN_REGS_PARM4(x) ((x)->r10)
+#else
+#define KERN_REGS_PARM4(x) (PT_REGS_PARM4(x))
+#endif
 
-    struct pt_regs * __ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);
-    void *oldpath;
-    void *newpath;
-    bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM1(__ctx));
-    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
-
-    sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
-    if (event) {
-        make_sec_meta(&event->meta);
-        print_sec_meta(&event->meta);
-        event->meta.op = OP_RENAME;
-
-        bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
-        bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
-
-        bpf_ringbuf_submit(event, get_flags());
-    }
-
-    return 0;
-}
 
 SEC("kprobe/sys_renameat")
 int kprobe_sys_renameat(struct pt_regs *ctx) {
@@ -236,16 +218,18 @@ int kprobe_sys_renameat(struct pt_regs *ctx) {
     void *oldpath;
     void *newpath;
     bpf_probe_read(&oldpath, sizeof(void *), (void *)&PT_REGS_PARM2(__ctx));
-    bpf_probe_read(&newpath, sizeof(void *), (void *)&PT_REGS_PARM4(__ctx));
+    bpf_probe_read(&newpath, sizeof(void *), (void *)&KERN_REGS_PARM4(__ctx));
 
     sec_event_t *event = bpf_ringbuf_reserve(&events, sizeof(sec_event_t), 0);
     if (event) {
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
         event->meta.op = OP_RENAMEAT;
-        
+
         bpf_probe_read_str(event->filename, MAX_STR_LEN, oldpath);
         bpf_probe_read_str(event->buf, MAX_STR_LEN, newpath);
+
+        bpf_printk("oldpath = %s, newpath = %s", event->filename, event->buf);
 
         bpf_ringbuf_submit(event, get_flags());
     }

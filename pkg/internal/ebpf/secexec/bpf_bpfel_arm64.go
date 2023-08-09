@@ -98,7 +98,6 @@ type bpfProgramSpecs struct {
 	KprobeDoTaskDead        *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
 	KprobeSysExecve         *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
-	KprobeSysRename         *ebpf.ProgramSpec `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlinkat"`
@@ -167,7 +166,6 @@ type bpfPrograms struct {
 	KprobeDoTaskDead        *ebpf.Program `ebpf:"kprobe_do_task_dead"`
 	KprobeSysExecve         *ebpf.Program `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
-	KprobeSysRename         *ebpf.Program `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.Program `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.Program `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.Program `ebpf:"kprobe_sys_unlinkat"`
@@ -187,7 +185,6 @@ func (p *bpfPrograms) Close() error {
 		p.KprobeDoTaskDead,
 		p.KprobeSysExecve,
 		p.KprobeSysExecveat,
-		p.KprobeSysRename,
 		p.KprobeSysRenameat,
 		p.KprobeSysUnlink,
 		p.KprobeSysUnlinkat,
