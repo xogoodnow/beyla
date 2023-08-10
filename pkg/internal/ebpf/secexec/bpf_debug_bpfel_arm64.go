@@ -96,8 +96,12 @@ type bpf_debugSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpf_debugProgramSpecs struct {
 	KprobeDoTaskDead        *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
+	KprobeSysCreat          *ebpf.ProgramSpec `ebpf:"kprobe_sys_creat"`
 	KprobeSysExecve         *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
+	KprobeSysOpen           *ebpf.ProgramSpec `ebpf:"kprobe_sys_open"`
+	KprobeSysOpenat         *ebpf.ProgramSpec `ebpf:"kprobe_sys_openat"`
+	KprobeSysRename         *ebpf.ProgramSpec `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlinkat"`
@@ -164,8 +168,12 @@ func (m *bpf_debugMaps) Close() error {
 // It can be passed to loadBpf_debugObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpf_debugPrograms struct {
 	KprobeDoTaskDead        *ebpf.Program `ebpf:"kprobe_do_task_dead"`
+	KprobeSysCreat          *ebpf.Program `ebpf:"kprobe_sys_creat"`
 	KprobeSysExecve         *ebpf.Program `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
+	KprobeSysOpen           *ebpf.Program `ebpf:"kprobe_sys_open"`
+	KprobeSysOpenat         *ebpf.Program `ebpf:"kprobe_sys_openat"`
+	KprobeSysRename         *ebpf.Program `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.Program `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.Program `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.Program `ebpf:"kprobe_sys_unlinkat"`
@@ -183,8 +191,12 @@ type bpf_debugPrograms struct {
 func (p *bpf_debugPrograms) Close() error {
 	return _Bpf_debugClose(
 		p.KprobeDoTaskDead,
+		p.KprobeSysCreat,
 		p.KprobeSysExecve,
 		p.KprobeSysExecveat,
+		p.KprobeSysOpen,
+		p.KprobeSysOpenat,
+		p.KprobeSysRename,
 		p.KprobeSysRenameat,
 		p.KprobeSysUnlink,
 		p.KprobeSysUnlinkat,

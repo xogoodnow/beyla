@@ -17,6 +17,9 @@
 #define OP_RENAMEAT 8
 #define OP_UNLINK 9
 #define OP_UNLINKAT 10
+#define OP_CREAT 11
+#define OP_OPEN 12
+#define OP_OPENAT 13
 
 #define CGRP_NAME_LEN 128
 #define EVENT_BUF_LEN 2048
