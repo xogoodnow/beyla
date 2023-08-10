@@ -37,18 +37,20 @@ func SecurityLoggerNode(_ context.Context, config SecurityConfig) (node.Terminal
 		for events := range input {
 			for i := range events {
 				e := events[i]
-				jsonBytes, err := json.Marshal(e)
-				if err != nil {
-					log.Error("Error encoding JSON:", err)
-					return
-				}
+				if e.Comm != "promtail" {
+					jsonBytes, err := json.Marshal(e)
+					if err != nil {
+						log.Error("Error encoding JSON:", err)
+						return
+					}
 
-				jsonBytes = append(jsonBytes, '\n')
+					jsonBytes = append(jsonBytes, '\n')
 
-				fmt.Printf("%s\n", jsonBytes)
-				if _, err := file.Write(jsonBytes); err != nil {
-					log.Error("Error writing to log file:", err)
-					return
+					fmt.Printf("%s\n", jsonBytes)
+					if _, err := file.Write(jsonBytes); err != nil {
+						log.Error("Error writing to log file:", err)
+						return
+					}
 				}
 			}
 		}
