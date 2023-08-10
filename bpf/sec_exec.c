@@ -61,7 +61,8 @@ static __always_inline void execve_event(const char *filename, const char *const
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
         event->meta.op = op;
-        int pos = 0;
+        unsigned char *b = &(event->buf[0]);
+        unsigned char *end = &(event->buf[EVENT_BUF_LEN]);
 
         int len = bpf_probe_read_str(event->filename, MAX_STR_LEN, filename);
         if (len > 0) {
@@ -82,40 +83,27 @@ static __always_inline void execve_event(const char *filename, const char *const
                 goto out;
             }
 
-            if (pos >= EVENT_BUF_LEN) {
+            if (b >= end) {
                 goto out;
             }
 
-            if (pos != 0) {
-                event->buf[pos] = ' ';
-                pos ++;
+            if (b != event->buf) {
+                *(b++) = ' ';
             }
 
-            if ((pos + MAX_STR_LEN) > EVENT_BUF_LEN) {
+            if ((b + MAX_STR_LEN) > end) {
                 goto out;
             }
 
-            pos = (pos < (EVENT_BUF_LEN - MAX_STR_LEN)) ? pos : (EVENT_BUF_LEN - MAX_STR_LEN);
-
-            int len = bpf_probe_read_str(&(event->buf[pos]), MAX_STR_LEN, argp);
-            
+            int len = bpf_probe_read_str(b, MAX_STR_LEN, argp);
             if (len > 0) {
-                len = len - 1;
-                len = (len < 0) ? 0 : len;
-                len = (len < MAX_STR_LEN) ? len : MAX_STR_LEN;
-                pos += len; // ignore the null terminator
-                
-                if (pos >= EVENT_BUF_LEN) {
-                    goto out;
-                }
+                b += (u16)(len-1); // ignore the null terminator
             }
         }
 
-        if (pos >= EVENT_BUF_LEN) {
-            goto out;
+        if (b < end) {
+            *b = '\0';
         }
-
-        event->buf[pos] = '\0';
 out:
         bpf_dbg_printk("Command [%s]", event->buf);
         bpf_ringbuf_submit(event, get_flags());
