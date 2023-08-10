@@ -23,7 +23,7 @@ type bpfConnectionInfoT struct {
 type bpfSecEvent struct {
 	Meta     bpfSecEventMetaT
 	Filename [256]uint8
-	Buf      [2048]uint8
+	Buf      [5120]uint8
 	Type     uint8
 	_        [1]byte
 	Conn     bpfConnectionInfoT

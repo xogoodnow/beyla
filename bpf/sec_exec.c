@@ -9,8 +9,6 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-#define MAX_ARR_CNT 30
-
 #define MAX_CONCURRENT_REQUESTS 10000
 
 // Force emitting struct sec_event_t into the ELF for automatic creation of Golang struct
@@ -63,8 +61,7 @@ static __always_inline void execve_event(const char *filename, const char *const
         make_sec_meta(&event->meta);
         print_sec_meta(&event->meta);
         event->meta.op = op;
-        unsigned char *b = &(event->buf[0]);
-        unsigned char *end = &(event->buf[EVENT_BUF_LEN]);
+        int pos = 0;
 
         int len = bpf_probe_read_str(event->filename, MAX_STR_LEN, filename);
         if (len > 0) {
@@ -85,27 +82,40 @@ static __always_inline void execve_event(const char *filename, const char *const
                 goto out;
             }
 
-            if (b >= end) {
+            if (pos >= EVENT_BUF_LEN) {
                 goto out;
             }
 
-            if (b != event->buf) {
-                *(b++) = ' ';
+            if (pos != 0) {
+                event->buf[pos] = ' ';
+                pos ++;
             }
 
-            if ((b + MAX_STR_LEN) > end) {
+            if ((pos + MAX_STR_LEN) > EVENT_BUF_LEN) {
                 goto out;
             }
 
-            int len = bpf_probe_read_str(b, MAX_STR_LEN, argp);
+            pos = (pos < (EVENT_BUF_LEN - MAX_STR_LEN)) ? pos : (EVENT_BUF_LEN - MAX_STR_LEN);
+
+            int len = bpf_probe_read_str(&(event->buf[pos]), MAX_STR_LEN, argp);
+            
             if (len > 0) {
-                b += (u16)(len-1); // ignore the null terminator
+                len = len - 1;
+                len = (len < 0) ? 0 : len;
+                len = (len < MAX_STR_LEN) ? len : MAX_STR_LEN;
+                pos += len; // ignore the null terminator
+                
+                if (pos >= EVENT_BUF_LEN) {
+                    goto out;
+                }
             }
         }
 
-        if (b < end) {
-            *b = '\0';
+        if (pos >= EVENT_BUF_LEN) {
+            goto out;
         }
+
+        event->buf[pos] = '\0';
 out:
         bpf_dbg_printk("Command [%s]", event->buf);
         bpf_ringbuf_submit(event, get_flags());

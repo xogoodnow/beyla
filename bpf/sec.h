@@ -21,9 +21,10 @@
 #define OP_OPEN 12
 #define OP_OPENAT 13
 
+#define MAX_ARR_CNT 20
 #define CGRP_NAME_LEN 128
-#define EVENT_BUF_LEN 2048
 #define MAX_STR_LEN 256
+#define EVENT_BUF_LEN (MAX_ARR_CNT * MAX_STR_LEN)
 
 typedef struct connection_info {
     u8 s_addr[IP_V6_ADDR_LEN];

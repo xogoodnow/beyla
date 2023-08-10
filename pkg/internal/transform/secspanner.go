@@ -28,7 +28,7 @@ type SecurityEvent struct {
 	NetNs      uint32    `json:"network_namespace_id"`
 	CgrpName   string    `json:"cgroup_name"`
 	Comm       string    `json:"command"`
-	Filename   string    `json:"executable"`
+	Filename   string    `json:"filename"`
 	Buf        string    `json:"payload"`
 	Type       int       `json:"protocol"`
 	LocalIP    string    `json:"local_ip"`
