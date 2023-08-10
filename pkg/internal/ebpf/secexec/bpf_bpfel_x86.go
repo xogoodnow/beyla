@@ -96,8 +96,12 @@ type bpfSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
 	KprobeDoTaskDead        *ebpf.ProgramSpec `ebpf:"kprobe_do_task_dead"`
+	KprobeSysCreat          *ebpf.ProgramSpec `ebpf:"kprobe_sys_creat"`
 	KprobeSysExecve         *ebpf.ProgramSpec `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_execveat"`
+	KprobeSysOpen           *ebpf.ProgramSpec `ebpf:"kprobe_sys_open"`
+	KprobeSysOpenat         *ebpf.ProgramSpec `ebpf:"kprobe_sys_openat"`
+	KprobeSysRename         *ebpf.ProgramSpec `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.ProgramSpec `ebpf:"kprobe_sys_unlinkat"`
@@ -164,8 +168,12 @@ func (m *bpfMaps) Close() error {
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
 	KprobeDoTaskDead        *ebpf.Program `ebpf:"kprobe_do_task_dead"`
+	KprobeSysCreat          *ebpf.Program `ebpf:"kprobe_sys_creat"`
 	KprobeSysExecve         *ebpf.Program `ebpf:"kprobe_sys_execve"`
 	KprobeSysExecveat       *ebpf.Program `ebpf:"kprobe_sys_execveat"`
+	KprobeSysOpen           *ebpf.Program `ebpf:"kprobe_sys_open"`
+	KprobeSysOpenat         *ebpf.Program `ebpf:"kprobe_sys_openat"`
+	KprobeSysRename         *ebpf.Program `ebpf:"kprobe_sys_rename"`
 	KprobeSysRenameat       *ebpf.Program `ebpf:"kprobe_sys_renameat"`
 	KprobeSysUnlink         *ebpf.Program `ebpf:"kprobe_sys_unlink"`
 	KprobeSysUnlinkat       *ebpf.Program `ebpf:"kprobe_sys_unlinkat"`
@@ -183,8 +191,12 @@ type bpfPrograms struct {
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
 		p.KprobeDoTaskDead,
+		p.KprobeSysCreat,
 		p.KprobeSysExecve,
 		p.KprobeSysExecveat,
+		p.KprobeSysOpen,
+		p.KprobeSysOpenat,
+		p.KprobeSysRename,
 		p.KprobeSysRenameat,
 		p.KprobeSysUnlink,
 		p.KprobeSysUnlinkat,
