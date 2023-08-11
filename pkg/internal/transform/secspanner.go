@@ -80,9 +80,9 @@ func opName(op uint8) string {
 	case 8:
 		return "OP_RENAMEAT"
 	case 9:
-		return "UNLINK"
+		return "OP_UNLINK"
 	case 10:
-		return "UNLINKAT"
+		return "OP_UNLINKAT"
 	case 11:
 		return "OP_CREAT"
 	case 12:
