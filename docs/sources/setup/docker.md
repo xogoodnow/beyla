@@ -15,7 +15,7 @@ aliases:
 
 Beyla can run a standalone Docker container that can instrument a process running in another container.
 
-Find the latest image of Beyla on [Docker Hub](https://hub.docker.com/r/grafana/beyla) with the following name:
+Find the `latest` image of Beyla on [Docker Hub](https://hub.docker.com/r/grafana/beyla) with the following name:
 
 ```
 grafana/beyla:latest
@@ -35,9 +35,9 @@ For this example you need a container running an HTTP/S or GRPC service. If you 
 docker run -p 18443:8443 --name goblog mariomac/goblog:dev
 ```
 
-The above command runs a simple HTTPS application. The process opens the container's internal port `8443`, which is then exposed at the host level as the port `18443`.
+The preceding command runs a simple HTTPS application. The process opens the container's internal port `8443`, which is then exposed at the host level as the port `18443`.
 
-Set environment variables to configure Beyla to print to stdout and listen to a port (container) to inspect the executable:
+Set environment variables to configure Beyla to print to `stdout` and listen to a port (container) to inspect the executable:
 
 ```sh
 export BEYLA_PRINT_TRACES=true
@@ -59,7 +59,7 @@ docker run --rm \
   grafana/beyla:latest
 ```
 
-Once Beyla is running, open `https://localhost:8443` in your browser, use the app to generate test data, and verify that Beyla prints trace requests to stdout similar to:
+After Beyla is running, open `https://localhost:8443` in your browser, use the app to generate test data, and verify that Beyla prints trace requests to `stdout` similar to:
 
 ```sh
 time=2023-05-22T14:03:42.402Z level=INFO msg="creating instrumentation pipeline"

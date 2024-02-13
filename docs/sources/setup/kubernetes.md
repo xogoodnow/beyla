@@ -366,7 +366,7 @@ data:
         - /factorial/{num}
 ```
 
-Example of Beyla DaemonSet configuration, mounting and accessing to the
+Example of Beyla DaemonSet configuration, mounting, and accessing to the
 previous ConfigMap:
 
 ```yaml

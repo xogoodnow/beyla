@@ -11,10 +11,10 @@ aliases:
   - /docs/grafana-cloud/monitor-applications/beyla/stability/
 ---
 
-# Stability Guarantees
+# Stability guarantees
 
 Beyla promises configuration and exposition format stability within a major version, and strives to avoid breaking changes for key features.
-Some features, which are of cosmetic nature, experimental or still under development, are not covered by this. We can only guarantee stability
+Some features, which are of cosmetic nature, experimental, or still under development, aren't covered by this. We can only guarantee stability
 for Linux kernel, or eBPF features of the Linux kernel, versions released at the time the Beyla major version was released.
 
 ## Things considered stable for version 1.x:
