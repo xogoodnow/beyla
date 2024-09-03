@@ -113,20 +113,6 @@ func (p *Tracer) Constants(_ *exec.FileInfo, offsets *goexec.Offsets) map[string
 		"conn_fd_pos",
 		"fd_laddr_pos",
 		"fd_raddr_pos",
-		// Go gRPC
-		// "grpc_stream_st_ptr_pos",
-		// "grpc_stream_method_ptr_pos",
-		// "grpc_status_s_pos",
-		// "grpc_status_code_ptr_pos",
-		// "grpc_st_conn_pos",
-		// "grpc_stream_ctx_ptr_pos",
-		// "grpc_t_conn_pos",
-		// "grpc_t_scheme_pos",
-		// "value_context_val_ptr_pos",
-		// "http2_client_next_id_pos",
-		// "framer_w_pos",
-		// "grpc_transport_buf_writer_buf_pos",
-		// "grpc_transport_buf_writer_offset_pos",
 	} {
 		constants[s] = offsets.Field[s]
 	}
@@ -137,6 +123,19 @@ func (p *Tracer) Constants(_ *exec.FileInfo, offsets *goexec.Offsets) map[string
 		"framer_w_pos",
 		"cc_tconn_pos",
 		"sc_conn_pos",
+		// Go gRPC
+		"grpc_stream_st_ptr_pos",
+		"grpc_stream_method_ptr_pos",
+		"grpc_status_s_pos",
+		"grpc_status_code_ptr_pos",
+		"grpc_st_conn_pos",
+		"grpc_stream_ctx_ptr_pos",
+		"grpc_t_conn_pos",
+		"grpc_t_scheme_pos",
+		"value_context_val_ptr_pos",
+		"http2_client_next_id_pos",
+		"grpc_transport_buf_writer_buf_pos",
+		"grpc_transport_buf_writer_offset_pos",
 	} {
 		constants[s] = offsets.Field[s]
 		if constants[s] == nil {
