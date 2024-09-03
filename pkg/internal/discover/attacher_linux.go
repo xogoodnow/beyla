@@ -68,8 +68,8 @@ func (ta *TraceAttacher) init() error {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return fmt.Errorf("removing memory lock: %w", err)
 	}
-	if err := ta.mountBpfPinPath(); err != nil {
-		return fmt.Errorf("can't mount BPF filesystem: %w", err)
-	}
+	// if err := ta.mountBpfPinPath(); err != nil {
+	// 	return fmt.Errorf("can't mount BPF filesystem: %w", err)
+	// }
 	return nil
 }

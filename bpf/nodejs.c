@@ -15,7 +15,7 @@ struct {
     __type(key, u64);   // the pid_tid 
     __type(value, u64); // the last AsyncWrap *
     __uint(max_entries, 1000); // 1000 nodejs services, small number, nodejs is single threaded
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    // __uint(pinning, LIBBPF_PIN_BY_NAME);
 } async_reset_args SEC(".maps");
 
 SEC("uprobe/node:AsyncReset")

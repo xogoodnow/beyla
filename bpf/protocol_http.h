@@ -24,7 +24,7 @@ struct {
     __type(key, pid_connection_info_t);
     __type(value, http_info_t);
     __uint(max_entries, MAX_CONCURRENT_SHARED_REQUESTS);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    // __uint(pinning, LIBBPF_PIN_BY_NAME);
 } ongoing_http SEC(".maps");
 
 struct {
@@ -32,7 +32,7 @@ struct {
     __type(key, connection_info_t);
     __type(value, http_info_t);
     __uint(max_entries, 1024);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    // __uint(pinning, LIBBPF_PIN_BY_NAME);
 } ongoing_http_fallback SEC(".maps");
 
 // empty_http_info zeroes and return the unique percpu copy in the map

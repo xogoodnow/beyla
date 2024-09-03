@@ -78,7 +78,7 @@ func (ta *TraceAttacher) attacherLoop() (pipe.FinalFunc[[]Event[Instrumentable]]
 		}
 		// waiting until context is done, in the case of SystemWide instrumentation
 		<-ta.Ctx.Done()
-		ta.close()
+		//ta.close()
 	}, nil
 }
 
@@ -256,6 +256,7 @@ programs:
 				continue programs
 			}
 		}
+
 		filtered = append(filtered, p)
 	}
 	return filtered
