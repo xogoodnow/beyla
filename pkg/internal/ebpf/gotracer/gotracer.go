@@ -226,44 +226,39 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 			End:   p.bpfObjects.UprobeQueryReturn,
 		},
 		// Go gRPC
-		// "google.golang.org/grpc.(*Server).handleStream": {
-		// 	Required: true,
-		// 	Start:    p.bpfObjects.UprobeServerHandleStream,
-		// 	End:      p.bpfObjects.UprobeServerHandleStreamReturn,
-		// },
-		// "google.golang.org/grpc/internal/transport.(*http2Server).WriteStatus": {
-		// 	Required: true,
-		// 	Start:    p.bpfObjects.UprobeTransportWriteStatus,
-		// },
-		// "google.golang.org/grpc.(*ClientConn).Invoke": {
-		// 	Required: true,
-		// 	Start:    p.bpfObjects.UprobeClientConnInvoke,
-		// 	End:      p.bpfObjects.UprobeClientConnInvokeReturn,
-		// },
-		// "google.golang.org/grpc.(*ClientConn).NewStream": {
-		// 	Required: true,
-		// 	Start:    p.bpfObjects.UprobeClientConnNewStream,
-		// 	End:      p.bpfObjects.UprobeServerHandleStreamReturn,
-		// },
-		// "google.golang.org/grpc.(*ClientConn).Close": {
-		// 	Required: true,
-		// 	Start:    p.bpfObjects.UprobeClientConnClose,
-		// },
-		// "google.golang.org/grpc.(*clientStream).RecvMsg": {
-		// 	End: p.bpfObjects.UprobeClientStreamRecvMsgReturn,
-		// },
-		// "google.golang.org/grpc.(*clientStream).CloseSend": {
-		// 	End: p.bpfObjects.UprobeClientConnInvokeReturn,
-		// },
-		// "google.golang.org/grpc/internal/transport.(*http2Client).NewStream": {
-		// 	Start: p.bpfObjects.UprobeTransportHttp2ClientNewStream,
-		// },
-		// "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders": {
-		// 	Start: p.bpfObjects.UprobeHttp2ServerOperateHeaders,
-		// },
-		// "google.golang.org/grpc/internal/transport.(*serverHandlerTransport).HandleStreams": {
-		// 	Start: p.bpfObjects.UprobeServerHandlerTransportHandleStreams,
-		// },
+		"google.golang.org/grpc.(*Server).handleStream": {
+			Start: p.bpfObjects.UprobeServerHandleStream,
+			End:   p.bpfObjects.UprobeServerHandleStreamReturn,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Server).WriteStatus": {
+			Start: p.bpfObjects.UprobeTransportWriteStatus,
+		},
+		"google.golang.org/grpc.(*ClientConn).Invoke": {
+			Start: p.bpfObjects.UprobeClientConnInvoke,
+			End:   p.bpfObjects.UprobeClientConnInvokeReturn,
+		},
+		"google.golang.org/grpc.(*ClientConn).NewStream": {
+			Start: p.bpfObjects.UprobeClientConnNewStream,
+			End:   p.bpfObjects.UprobeServerHandleStreamReturn,
+		},
+		"google.golang.org/grpc.(*ClientConn).Close": {
+			Start: p.bpfObjects.UprobeClientConnClose,
+		},
+		"google.golang.org/grpc.(*clientStream).RecvMsg": {
+			End: p.bpfObjects.UprobeClientStreamRecvMsgReturn,
+		},
+		"google.golang.org/grpc.(*clientStream).CloseSend": {
+			End: p.bpfObjects.UprobeClientConnInvokeReturn,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Client).NewStream": {
+			Start: p.bpfObjects.UprobeTransportHttp2ClientNewStream,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders": {
+			Start: p.bpfObjects.UprobeHttp2ServerOperateHeaders,
+		},
+		"google.golang.org/grpc/internal/transport.(*serverHandlerTransport).HandleStreams": {
+			Start: p.bpfObjects.UprobeServerHandlerTransportHandleStreams,
+		},
 		// TODO: duplicate symbol, but different function
 		// "net.(*netFD).Read": {
 		// 	Start: p.bpfObjects.UprobeNetFdReadGRPC,
