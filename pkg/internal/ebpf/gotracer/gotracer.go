@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nethttp
+package gotracer
 
 import (
 	"context"
@@ -31,10 +31,10 @@ import (
 	"github.com/grafana/beyla/pkg/internal/svc"
 )
 
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/go_nethttp.c -- -I../../../../bpf/headers -DNO_HEADER_PROPAGATION
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/go_nethttp.c -- -I../../../../bpf/headers -DBPF_DEBUG -DNO_HEADER_PROPAGATION
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp ../../../../bpf/go_nethttp.c -- -I../../../../bpf/headers
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp_debug ../../../../bpf/go_nethttp.c -- -I../../../../bpf/headers -DBPF_DEBUG
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DNO_HEADER_PROPAGATION
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DBPF_DEBUG -DNO_HEADER_PROPAGATION
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp_debug ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DBPF_DEBUG
 
 type Tracer struct {
 	log        *slog.Logger
@@ -46,7 +46,7 @@ type Tracer struct {
 }
 
 func New(cfg *beyla.Config, metrics imetrics.Reporter) *Tracer {
-	log := slog.With("component", "nethttp.Tracer")
+	log := slog.With("component", "go.Tracer")
 	return &Tracer{
 		log:        log,
 		pidsFilter: ebpfcommon.CommonPIDsFilter(&cfg.Discovery),
@@ -94,6 +94,7 @@ func (p *Tracer) Constants(_ *exec.FileInfo, offsets *goexec.Offsets) map[string
 		"wakeup_data_bytes": uint32(p.cfg.WakeupLen) * uint32(unsafe.Sizeof(ebpfcommon.HTTPRequestTrace{})),
 	}
 	for _, s := range []string{
+		// Go net/http
 		"url_ptr_pos",
 		"path_ptr_pos",
 		"method_ptr_pos",
@@ -112,6 +113,20 @@ func (p *Tracer) Constants(_ *exec.FileInfo, offsets *goexec.Offsets) map[string
 		"conn_fd_pos",
 		"fd_laddr_pos",
 		"fd_raddr_pos",
+		// Go gRPC
+		"grpc_stream_st_ptr_pos",
+		"grpc_stream_method_ptr_pos",
+		"grpc_status_s_pos",
+		"grpc_status_code_ptr_pos",
+		"grpc_st_conn_pos",
+		"grpc_stream_ctx_ptr_pos",
+		"grpc_t_conn_pos",
+		"grpc_t_scheme_pos",
+		"value_context_val_ptr_pos",
+		"http2_client_next_id_pos",
+		"framer_w_pos",
+		"grpc_transport_buf_writer_buf_pos",
+		"grpc_transport_buf_writer_offset_pos",
 	} {
 		constants[s] = offsets.Field[s]
 	}
@@ -142,6 +157,15 @@ func (p *Tracer) AddCloser(c ...io.Closer) {
 
 func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 	m := map[string]ebpfcommon.FunctionPrograms{
+		// Go runtime
+		"runtime.newproc1": {
+			Start: p.bpfObjects.UprobeProcNewproc1,
+			End:   p.bpfObjects.UprobeProcNewproc1Ret,
+		},
+		"runtime.goexit1": {
+			Start: p.bpfObjects.UprobeProcGoexit1,
+		},
+		// Go net/http
 		"net/http.serverHandler.ServeHTTP": {
 			Start: p.bpfObjects.UprobeServeHTTP,
 			End:   p.bpfObjects.UprobeServeHTTPReturns,
@@ -201,6 +225,49 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 			Start: p.bpfObjects.UprobeExecDC,
 			End:   p.bpfObjects.UprobeQueryReturn,
 		},
+		// Go gRPC
+		"google.golang.org/grpc.(*Server).handleStream": {
+			Required: true,
+			Start:    p.bpfObjects.UprobeServerHandleStream,
+			End:      p.bpfObjects.UprobeServerHandleStreamReturn,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Server).WriteStatus": {
+			Required: true,
+			Start:    p.bpfObjects.UprobeTransportWriteStatus,
+		},
+		"google.golang.org/grpc.(*ClientConn).Invoke": {
+			Required: true,
+			Start:    p.bpfObjects.UprobeClientConnInvoke,
+			End:      p.bpfObjects.UprobeClientConnInvokeReturn,
+		},
+		"google.golang.org/grpc.(*ClientConn).NewStream": {
+			Required: true,
+			Start:    p.bpfObjects.UprobeClientConnNewStream,
+			End:      p.bpfObjects.UprobeServerHandleStreamReturn,
+		},
+		"google.golang.org/grpc.(*ClientConn).Close": {
+			Required: true,
+			Start:    p.bpfObjects.UprobeClientConnClose,
+		},
+		"google.golang.org/grpc.(*clientStream).RecvMsg": {
+			End: p.bpfObjects.UprobeClientStreamRecvMsgReturn,
+		},
+		"google.golang.org/grpc.(*clientStream).CloseSend": {
+			End: p.bpfObjects.UprobeClientConnInvokeReturn,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Client).NewStream": {
+			Start: p.bpfObjects.UprobeTransportHttp2ClientNewStream,
+		},
+		"google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders": {
+			Start: p.bpfObjects.UprobeHttp2ServerOperateHeaders,
+		},
+		"google.golang.org/grpc/internal/transport.(*serverHandlerTransport).HandleStreams": {
+			Start: p.bpfObjects.UprobeServerHandlerTransportHandleStreams,
+		},
+		// TODO: duplicate symbol, but different function
+		// "net.(*netFD).Read": {
+		// 	Start: p.bpfObjects.UprobeNetFdReadGRPC,
+		// },
 	}
 
 	if p.supportsContextPropagation() {
@@ -215,6 +282,11 @@ func (p *Tracer) GoProbes() map[string]ebpfcommon.FunctionPrograms {
 			Start: p.bpfObjects.UprobeHttp2FramerWriteHeaders,
 			End:   p.bpfObjects.UprobeHttp2FramerWriteHeadersReturns,
 		}
+		// TODO: duplicate symbol, but different function
+		// m["golang.org/x/net/http2.(*Framer).WriteHeaders"] = ebpfcommon.FunctionPrograms{
+		// 	Start: p.bpfObjects.UprobeGrpcFramerWriteHeaders,
+		// 	End:   p.bpfObjects.UprobeGrpcFramerWriteHeadersReturns,
+		// }
 	}
 
 	return m
