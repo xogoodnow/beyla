@@ -354,3 +354,5 @@ func (p *Tracer) watchForMisclassifedEvents() {
 		}
 	}
 }
+
+func (p *Tracer) RunDebugger(ctx context.Context) {}

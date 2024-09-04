@@ -63,6 +63,13 @@ type bpf_debugHttpFuncInvocationT struct {
 	Tp              bpf_debugTpInfoT
 }
 
+type bpf_debugLogInfoT struct {
+	Log  [80]int8
+	Comm [20]int8
+	_    [4]byte
+	Pid  uint64
+}
+
 type bpf_debugNewFuncInvocationT struct{ Parent uint64 }
 
 type bpf_debugServerHttpFuncInvocationT struct {

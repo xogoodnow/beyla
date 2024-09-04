@@ -73,6 +73,8 @@ type Tracer interface {
 	// Run will do the action of listening for eBPF traces and forward them
 	// periodically to the output channel.
 	Run(context.Context, chan<- []request.Span)
+	// RunDebugger will process debug events from the eBPF ringbuffer
+	RunDebugger(context.Context)
 }
 
 // Subset of the above interface, which supports loading eBPF programs which

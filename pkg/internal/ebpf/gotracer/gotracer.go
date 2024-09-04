@@ -15,12 +15,15 @@
 package gotracer
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 	"log/slog"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/ringbuf"
 
 	"github.com/grafana/beyla/pkg/beyla"
 	ebpfcommon "github.com/grafana/beyla/pkg/internal/ebpf/common"
@@ -32,17 +35,18 @@ import (
 )
 
 //go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DNO_HEADER_PROPAGATION
-//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_debug ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DBPF_DEBUG -DNO_HEADER_PROPAGATION
+//go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -type log_info_t -target amd64,arm64 bpf_debug ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DBPF_DEBUG -DNO_HEADER_PROPAGATION
 //go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers
 //go:generate $BPF2GO -cc $BPF_CLANG -cflags $BPF_CFLAGS -target amd64,arm64 bpf_tp_debug ../../../../bpf/go_tracer.c -- -I../../../../bpf/headers -DBPF_DEBUG
 
 type Tracer struct {
-	log        *slog.Logger
-	pidsFilter ebpfcommon.ServiceFilter
-	cfg        *ebpfcommon.TracerConfig
-	metrics    imetrics.Reporter
-	bpfObjects bpfObjects
-	closers    []io.Closer
+	log             *slog.Logger
+	pidsFilter      ebpfcommon.ServiceFilter
+	cfg             *ebpfcommon.TracerConfig
+	metrics         imetrics.Reporter
+	bpfObjects      bpfObjects
+	bpfDebugObjects bpf_debugObjects
+	closers         []io.Closer
 }
 
 func New(cfg *beyla.Config, metrics imetrics.Reporter) *Tracer {
@@ -315,4 +319,40 @@ func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []request.Span) {
 		p.bpfObjects.Events,
 		p.metrics,
 	)(ctx, append(p.closers, &p.bpfObjects), eventsChan)
+}
+
+func (p *Tracer) RunDebugger(ctx context.Context) {
+	ebpfcommon.ForwardRingbuf(
+		p.cfg,
+		p.bpfDebugObjects.Events,
+		&ebpfcommon.IdentityPidsFilter{},
+		p.processLogEvent,
+		p.log,
+		nil,
+		append(p.closers, &p.bpfObjects)...,
+	)(ctx, nil)
+}
+
+func (p *Tracer) processLogEvent(record *ringbuf.Record, _ ebpfcommon.ServiceFilter) (request.Span, bool, error) {
+	var event bpf_debugLogInfoT
+
+	err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
+
+	if err == nil {
+		p.log.Debug(readString(event.Log[:]), "pid", event.Pid, "comm", readString(event.Comm[:]))
+	}
+
+	return request.Span{}, true, nil
+}
+
+func readString(data []int8) string {
+	bytes := make([]byte, len(data))
+	for i, v := range data {
+		if v == 0 { // null-terminated string
+			bytes = bytes[:i]
+			break
+		}
+		bytes[i] = byte(v)
+	}
+	return string(bytes)
 }

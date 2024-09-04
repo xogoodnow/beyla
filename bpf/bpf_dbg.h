@@ -20,6 +20,8 @@ typedef struct log_info {
     u64 pid;
 } log_info_t;
 
+const log_info_t *unused_100 __attribute__((unused));
+
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 1 << 12);

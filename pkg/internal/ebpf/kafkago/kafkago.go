@@ -160,3 +160,5 @@ func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []request.Span) {
 		p.metrics,
 	)(ctx, append(p.closers, &p.bpfObjects), eventsChan)
 }
+
+func (p *Tracer) RunDebugger(ctx context.Context) {}

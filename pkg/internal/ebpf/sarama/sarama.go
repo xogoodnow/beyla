@@ -147,6 +147,10 @@ func (p *Tracer) Run(ctx context.Context, eventsChan chan<- []request.Span) {
 	)(ctx, append(p.closers, &p.bpfObjects), eventsChan)
 }
 
+func (p *Tracer) RunDebugger(ctx context.Context) {
+
+}
+
 // ShopifyKafkaTracer overrides Tracer to inspect the Shopify version of the library
 type ShopifyKafkaTracer struct {
 	Tracer

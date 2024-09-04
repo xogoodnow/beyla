@@ -16,7 +16,6 @@ import (
 
 	"github.com/grafana/beyla/pkg/beyla"
 	"github.com/grafana/beyla/pkg/internal/ebpf"
-	"github.com/grafana/beyla/pkg/internal/ebpf/logger"
 	"github.com/grafana/beyla/pkg/internal/ebpf/watcher"
 	"github.com/grafana/beyla/pkg/services"
 )
@@ -62,7 +61,6 @@ func ProcessWatcherFunc(ctx context.Context, cfg *beyla.Config) pipe.StartFunc[[
 		listProcesses:     fetchProcessPorts,
 		executableReady:   executableReady,
 		loadBPFWatcher:    loadBPFWatcher,
-		loadBPFLogger:     loadBPFLogger,
 		fetchPorts:        true,  // must be true until we've activated the bpf watcher component
 		bpfWatcherEnabled: false, // async set by listening on the bpfWatchEvents channel
 		stateMux:          sync.Mutex{},
@@ -111,12 +109,6 @@ func (pa *pollAccounter) Run(out chan<- []Event[processAttrs]) {
 	bpfWatchEvents := make(chan watcher.Event, 100)
 	if err := pa.loadBPFWatcher(pa.cfg, bpfWatchEvents); err != nil {
 		log.Error("Unable to load eBPF watcher for process events", "error", err)
-	}
-
-	if pa.cfg.EBPF.BpfDebug {
-		if err := pa.loadBPFLogger(pa.cfg); err != nil {
-			log.Error("Unable to load eBPF logger for process events", "error", err)
-		}
 	}
 
 	go pa.watchForProcessEvents(log, bpfWatchEvents)
@@ -327,10 +319,5 @@ func fetchProcessPorts(scanPorts bool) (map[PID]processAttrs, error) {
 
 func loadBPFWatcher(cfg *beyla.Config, events chan<- watcher.Event) error {
 	wt := watcher.New(cfg, events)
-	return ebpf.RunUtilityTracer(wt, BuildPinPath(cfg))
-}
-
-func loadBPFLogger(cfg *beyla.Config) error {
-	wt := logger.New(cfg)
 	return ebpf.RunUtilityTracer(wt, BuildPinPath(cfg))
 }

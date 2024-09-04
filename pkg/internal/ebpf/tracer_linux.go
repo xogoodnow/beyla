@@ -34,6 +34,7 @@ func (pt *ProcessTracer) Run(ctx context.Context, out chan<- []request.Span) {
 
 	for _, t := range trcrs {
 		go t.Run(ctx, out)
+		t.RunDebugger(ctx)
 	}
 	go func() {
 		<-ctx.Done()
