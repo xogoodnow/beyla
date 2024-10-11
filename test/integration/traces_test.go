@@ -752,7 +752,7 @@ func testNestedHTTPTracesKProbes(t *testing.T) {
 
 		// Check the information of the java parent span
 		res = trace.FindByOperationName("GET /jtrace")
-		require.Len(t, res, 1)
+		require.Len(t, res, 2)
 		parent = res[0]
 		require.NotEmpty(t, parent.TraceID)
 		require.Equal(t, traceID, parent.TraceID)
