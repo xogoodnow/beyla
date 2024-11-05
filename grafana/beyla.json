@@ -174,7 +174,7 @@
             "uid": "grafanacloud-prom"
           },
           "editorMode": "code",
-          "expr": "kube_daemonset_status_number_ready{daemonset=\"beyla\"}",
+          "expr": "kube_daemonset_status_number_ready{daemonset=~\"(beyla|grafana-k8s-monitoring-beyla)\"}",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
