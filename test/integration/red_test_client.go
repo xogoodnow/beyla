@@ -69,7 +69,7 @@ func testClientWithMethodAndStatusCode(t *testing.T, method string, statusCode i
 		trace = traces[0]
 	}, test.Interval(100*time.Millisecond))
 
-	spans := trace.FindByOperationName(method)
+	spans := trace.FindByOperationName(method, "server")
 	require.Len(t, spans, 1)
 	span := spans[0]
 
