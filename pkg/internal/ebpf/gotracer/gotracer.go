@@ -89,8 +89,14 @@ func (p *Tracer) Load() (*ebpf.CollectionSpec, error) {
 func (p *Tracer) SetupTailCalls() {}
 
 func (p *Tracer) Constants() map[string]any {
+	blackBoxCP := uint32(0)
+	if p.cfg.DisableBlackBoxCP {
+		blackBoxCP = uint32(1)
+	}
+
 	return map[string]any{
-		"wakeup_data_bytes": uint32(p.cfg.WakeupLen) * uint32(unsafe.Sizeof(ebpfcommon.HTTPRequestTrace{})),
+		"wakeup_data_bytes":    uint32(p.cfg.WakeupLen) * uint32(unsafe.Sizeof(ebpfcommon.HTTPRequestTrace{})),
+		"disable_black_box_cp": blackBoxCP,
 	}
 }
 
@@ -164,6 +170,10 @@ func (p *Tracer) AddCloser(c ...io.Closer) {
 	p.closers = append(p.closers, c...)
 }
 
+func (p *Tracer) AddModuleCloser(_ uint64, _ ...io.Closer) {
+	p.log.Warn("add module closer not implemented for Go")
+}
+
 func (p *Tracer) GoProbes() map[string][]ebpfcommon.FunctionPrograms {
 	m := map[string][]ebpfcommon.FunctionPrograms{
 		// Go runtime
@@ -222,9 +232,6 @@ func (p *Tracer) GoProbes() map[string][]ebpfcommon.FunctionPrograms {
 		"net.(*netFD).Read": {
 			{
 				Start: p.bpfObjects.UprobeNetFdRead,
-			},
-			{ // for grpc
-				Start: p.bpfObjects.UprobeNetFdReadGRPC,
 			},
 		},
 		"net/http.(*persistConn).roundTrip": {{ // http client
@@ -372,6 +379,8 @@ func (p *Tracer) SocketFilters() []*ebpf.Program {
 }
 
 func (p *Tracer) RecordInstrumentedLib(_ uint64) {}
+
+func (p *Tracer) UnlinkInstrumentedLib(_ uint64) {}
 
 func (p *Tracer) AlreadyInstrumentedLib(_ uint64) bool {
 	return false

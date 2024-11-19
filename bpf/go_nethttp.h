@@ -25,11 +25,6 @@
 #include "hpack.h"
 #include "ringbuf.h"
 
-typedef struct http_func_invocation {
-    u64 start_monotime_ns;
-    tp_info_t tp;
-} http_func_invocation_t;
-
 typedef struct http_client_data {
     u8 method[METHOD_MAX_LEN];
     u8 path[PATH_MAX_LEN];
@@ -37,13 +32,6 @@ typedef struct http_client_data {
 
     pid_info pid;
 } http_client_data_t;
-
-struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
-    __type(key, go_addr_key_t); // key: pointer to the request goroutine
-    __type(value, http_func_invocation_t);
-    __uint(max_entries, MAX_CONCURRENT_REQUESTS);
-} ongoing_http_client_requests SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -450,6 +438,13 @@ int uprobe_roundTripReturn(struct pt_regs *ctx) {
     connection_info_t *info = bpf_map_lookup_elem(&ongoing_client_connections, &g_key);
     if (info) {
         __builtin_memcpy(&trace->conn, info, sizeof(connection_info_t));
+
+        egress_key_t e_key = {
+            .d_port = info->d_port,
+            .s_port = info->s_port,
+        };
+        bpf_map_delete_elem(&outgoing_trace_map, &e_key);
+        bpf_map_delete_elem(&ongoing_go_http, &e_key);
     } else {
         __builtin_memset(&trace->conn, 0, sizeof(connection_info_t));
     }
@@ -912,17 +907,41 @@ int uprobe_netFdRead(struct pt_regs *ctx) {
     go_addr_key_t g_key = {};
     go_addr_key_from_id(&g_key, goroutine_addr);
 
+    // lookup active HTTP connection
     connection_info_t *conn = bpf_map_lookup_elem(&ongoing_server_connections, &g_key);
-
     if (conn) {
-        bpf_dbg_printk(
-            "Found existing server connection, parsing FD information for socket tuples, %llx",
-            goroutine_addr);
+        if (conn->d_port == 0 && conn->s_port == 0) {
+            bpf_dbg_printk(
+                "Found existing server connection, parsing FD information for socket tuples, %llx",
+                goroutine_addr);
 
-        void *fd_ptr = GO_PARAM1(ctx);
-        get_conn_info_from_fd(fd_ptr, conn); // ok to not check the result, we leave it as 0
-
+            void *fd_ptr = GO_PARAM1(ctx);
+            get_conn_info_from_fd(fd_ptr, conn); // ok to not check the result, we leave it as 0
+        }
         //dbg_print_http_connection_info(conn);
+    }
+    // lookup a grpc connection
+    // Sets up the connection info to be grabbed and mapped over the transport to operateHeaders
+    void *tr = bpf_map_lookup_elem(&ongoing_grpc_operate_headers, &g_key);
+    bpf_dbg_printk("tr %llx", tr);
+    if (tr) {
+        grpc_transports_t *t = bpf_map_lookup_elem(&ongoing_grpc_transports, tr);
+        bpf_dbg_printk("t %llx", t);
+        if (t) {
+            if (t->conn.d_port == 0 && t->conn.s_port == 0) {
+                void *fd_ptr = GO_PARAM1(ctx);
+                get_conn_info_from_fd(fd_ptr,
+                                      &t->conn); // ok to not check the result, we leave it as 0
+            }
+        }
+    }
+    // lookup active sql connection
+    sql_func_invocation_t *sql_conn = bpf_map_lookup_elem(&ongoing_sql_queries, &g_key);
+    bpf_dbg_printk("sql_conn %llx", sql_conn);
+    if (sql_conn) {
+        void *fd_ptr = GO_PARAM1(ctx);
+        get_conn_info_from_fd(fd_ptr,
+                              &sql_conn->conn); // ok to not check the result, we leave it as 0
     }
 
     return 0;
@@ -998,7 +1017,19 @@ int uprobe_persistConnRoundTrip(struct pt_regs *ctx) {
                 // Must sort the connection info, this map is shared with kprobes which use sorted connection
                 // info always.
                 sort_connection_info(&conn);
-                bpf_map_update_elem(&trace_map, &conn, &tp_p, BPF_ANY);
+                set_trace_info_for_connection(&conn, &tp_p);
+
+                // Setup information for the TC context propagation.
+                // We need the PID id to be able to query ongoing_http and update
+                // the span id with the SEQ/ACK pair.
+
+                egress_key_t e_key = {
+                    .d_port = conn.d_port,
+                    .s_port = conn.s_port,
+                };
+
+                bpf_map_update_elem(&outgoing_trace_map, &e_key, &tp_p, BPF_ANY);
+                bpf_map_update_elem(&ongoing_go_http, &e_key, &g_key, BPF_ANY);
             }
         }
     }

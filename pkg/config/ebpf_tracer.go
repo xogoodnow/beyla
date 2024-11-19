@@ -19,14 +19,6 @@ type EPPFTracer struct {
 	// reach the BatchLength size
 	BatchTimeout time.Duration `yaml:"batch_timeout" env:"BEYLA_BPF_BATCH_TIMEOUT"`
 
-	// BpfBaseDir specifies the base directory where the BPF pinned maps will be mounted.
-	// By default, it will be /var/run/beyla
-	BpfBaseDir string `yaml:"bpf_fs_base_dir" env:"BEYLA_BPF_FS_BASE_DIR"`
-
-	// BpfPath specifies the path in the base directory where the BPF pinned maps will be mounted.
-	// By default, it will be beyla-<pid>.
-	BpfPath string `yaml:"bpf_fs_path" env:"BEYLA_BPF_FS_PATH"`
-
 	// If enabled, the kprobes based HTTP request tracking will start tracking the request
 	// headers to process any 'Traceparent' fields.
 	TrackRequestHeaders bool `yaml:"track_request_headers" env:"BEYLA_BPF_TRACK_REQUEST_HEADERS"`
@@ -34,7 +26,13 @@ type EPPFTracer struct {
 	HTTPRequestTimeout time.Duration `yaml:"http_request_timeout" env:"BEYLA_BPF_HTTP_REQUEST_TIMEOUT"`
 
 	// Enables Linux Traffic Control probes for context propagation
-	UseLinuxTC bool `yaml:"enable_traffic_control" env:"BEYLA_BPF_TC"`
+	UseTCForCP bool `yaml:"traffic_control_context_propagation" env:"BEYLA_BPF_TC_CP"`
+
+	// Enables Linux Traffic Control probes for context propagation
+	UseTCForL7CP bool `yaml:"traffic_control_l7_context_propagation" env:"BEYLA_BPF_TC_L7_CP"`
+
+	// Disables Beyla black-box context propagation. Used for testing purposes only.
+	DisableBlackBoxCP bool `yaml:"disable_black_box_cp" env:"BEYLA_BPF_DISABLE_BLACK_BOX_CP"`
 
 	// Optimises for getting requests information immediately when request response is seen
 	HighRequestVolume bool `yaml:"high_request_volume" env:"BEYLA_BPF_HIGH_REQUEST_VOLUME"`

@@ -16,11 +16,13 @@
 #include "utils.h"
 #include "map_sizing.h"
 #include "bpf_dbg.h"
+#include "go_shared.h"
 #include "tracer_common.h"
 #include "tracing.h"
 #include "trace_util.h"
 #include "go_offsets.h"
 #include "go_traceparent.h"
+#include "pin_internal.h"
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
@@ -32,11 +34,6 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 // Then it is retrieved in the return uprobes and used to know the HTTP call duration as well as its
 // attributes (method, path, and status code).
 
-typedef struct go_addr_key {
-    u64 pid;  // PID of the process
-    u64 addr; // Address of the goroutine
-} go_addr_key_t;
-
 typedef struct goroutine_metadata_t {
     go_addr_key_t parent;
     u64 timestamp;
@@ -47,7 +44,7 @@ struct {
     __type(key, go_addr_key_t);        // key: pointer to the goroutine
     __type(value, goroutine_metadata); // value: timestamp of the goroutine creation
     __uint(max_entries, MAX_CONCURRENT_SHARED_REQUESTS);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(pinning, BEYLA_PIN_INTERNAL);
 } ongoing_goroutines SEC(".maps");
 
 struct {
@@ -55,7 +52,7 @@ struct {
     __type(key, go_addr_key_t); // key: pointer to the request goroutine
     __type(value, connection_info_t);
     __uint(max_entries, MAX_CONCURRENT_SHARED_REQUESTS);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(pinning, BEYLA_PIN_INTERNAL);
 } ongoing_server_connections SEC(".maps");
 
 struct {
@@ -70,8 +67,43 @@ struct {
     __type(key, go_addr_key_t); // key: pointer to the goroutine
     __type(value, tp_info_t);   // value: traceparent info
     __uint(max_entries, MAX_CONCURRENT_SHARED_REQUESTS);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(pinning, BEYLA_PIN_INTERNAL);
 } go_trace_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __type(key, go_addr_key_t); // key: goroutine
+    __type(value, void *);      // the transport *
+    __uint(max_entries, MAX_CONCURRENT_REQUESTS);
+} ongoing_grpc_operate_headers SEC(".maps");
+
+typedef struct grpc_transports {
+    u8 type;
+    connection_info_t conn;
+} grpc_transports_t;
+
+// TODO: use go_addr_key_t as key
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __type(key, void *); // key: pointer to the transport pointer
+    __type(value, grpc_transports_t);
+    __uint(max_entries, MAX_CONCURRENT_REQUESTS);
+} ongoing_grpc_transports SEC(".maps");
+
+typedef struct sql_func_invocation {
+    u64 start_monotime_ns;
+    u64 sql_param;
+    u64 query_len;
+    connection_info_t conn __attribute__((aligned(8)));
+    tp_info_t tp;
+} sql_func_invocation_t;
+
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __type(key, go_addr_key_t); // key: pointer to the request goroutine
+    __type(value, sql_func_invocation_t);
+    __uint(max_entries, MAX_CONCURRENT_REQUESTS);
+} ongoing_sql_queries SEC(".maps");
 
 static __always_inline void go_addr_key_from_id(go_addr_key_t *current, void *addr) {
     u64 pid_tid = bpf_get_current_pid_tgid();
@@ -172,13 +204,25 @@ server_trace_parent(void *goroutine_addr, tp_info_t *tp, void *req_header) {
             connection_info_t conn = *info;
             // Must sort here, Go connection info retains the original ordering.
             sort_connection_info(&conn);
-            bpf_dbg_printk("Looking up traceparent for connection info");
-            tp_info_pid_t *tp_p = trace_info_for_connection(&conn);
-            if (tp_p) {
-                if (correlated_request_with_current(tp_p)) {
-                    bpf_dbg_printk("Found traceparent from trace map, another process.");
-                    found_info = 1;
-                    tp_from_parent(tp, &tp_p->tp);
+
+            // First we look-up if we have information passed down to us from
+            // TCP/IP context propagation.
+            tp_info_pid_t *existing_tp = bpf_map_lookup_elem(&incoming_trace_map, &conn);
+            if (existing_tp) {
+                bpf_dbg_printk("Found incoming (TCP) tp for server request");
+                found_info = 1;
+                tp_from_parent(tp, &existing_tp->tp);
+                bpf_map_delete_elem(&incoming_trace_map, &conn);
+            } else {
+                // If not, we then look up the information in the black-box context map - same node.
+                bpf_dbg_printk("Looking up traceparent for connection info");
+                tp_info_pid_t *tp_p = trace_info_for_connection(&conn);
+                if (!disable_black_box_cp && tp_p) {
+                    if (correlated_request_with_current(tp_p)) {
+                        bpf_dbg_printk("Found traceparent from trace map, another process.");
+                        found_info = 1;
+                        tp_from_parent(tp, &tp_p->tp);
+                    }
                 }
             }
         }
@@ -221,10 +265,21 @@ static __always_inline u8 client_trace_parent(void *goroutine_addr,
         }
     }
 
+    go_addr_key_t g_key = {};
+    go_addr_key_from_id(&g_key, goroutine_addr);
+
+    // We first check for Cloud web databases (like snowflake), which wrap HTTP calls with SQL
+    // statements.
+    if (!found_trace_id) {
+        sql_func_invocation_t *invocation = bpf_map_lookup_elem(&ongoing_sql_queries, &g_key);
+        if (invocation) {
+            tp_from_parent(tp_i, &invocation->tp);
+            found_trace_id = 1;
+        }
+    }
+
     if (!found_trace_id) {
         tp_info_t *tp = 0;
-        go_addr_key_t g_key = {};
-        go_addr_key_from_id(&g_key, goroutine_addr);
 
         u64 parent_id = find_parent_goroutine(&g_key);
         go_addr_key_t p_key = {};

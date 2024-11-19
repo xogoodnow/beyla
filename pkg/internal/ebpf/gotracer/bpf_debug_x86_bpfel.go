@@ -19,6 +19,11 @@ type bpf_debugConnectionInfoT struct {
 	D_port uint16
 }
 
+type bpf_debugEgressKeyT struct {
+	S_port uint16
+	D_port uint16
+}
+
 type bpf_debugGoAddrKeyT struct {
 	Pid  uint64
 	Addr uint64
@@ -141,6 +146,8 @@ type bpf_debugSqlFuncInvocationT struct {
 	StartMonotimeNs uint64
 	SqlParam        uint64
 	QueryLen        uint64
+	Conn            bpf_debugConnectionInfoT
+	_               [4]byte
 	Tp              bpf_debugTpInfoT
 }
 
@@ -227,7 +234,6 @@ type bpf_debugProgramSpecs struct {
 	UprobeHttp2ServerOperateHeaders           *ebpf.ProgramSpec `ebpf:"uprobe_http2Server_operateHeaders"`
 	UprobeHttp2serverConnRunHandler           *ebpf.ProgramSpec `ebpf:"uprobe_http2serverConn_runHandler"`
 	UprobeNetFdRead                           *ebpf.ProgramSpec `ebpf:"uprobe_netFdRead"`
-	UprobeNetFdReadGRPC                       *ebpf.ProgramSpec `ebpf:"uprobe_netFdReadGRPC"`
 	UprobePersistConnRoundTrip                *ebpf.ProgramSpec `ebpf:"uprobe_persistConnRoundTrip"`
 	UprobeProcGoexit1                         *ebpf.ProgramSpec `ebpf:"uprobe_proc_goexit1"`
 	UprobeProcNewproc1                        *ebpf.ProgramSpec `ebpf:"uprobe_proc_newproc1"`
@@ -274,6 +280,7 @@ type bpf_debugMapSpecs struct {
 	KafkaRequests                 *ebpf.MapSpec `ebpf:"kafka_requests"`
 	Newproc1                      *ebpf.MapSpec `ebpf:"newproc1"`
 	OngoingClientConnections      *ebpf.MapSpec `ebpf:"ongoing_client_connections"`
+	OngoingGoHttp                 *ebpf.MapSpec `ebpf:"ongoing_go_http"`
 	OngoingGoroutines             *ebpf.MapSpec `ebpf:"ongoing_goroutines"`
 	OngoingGrpcClientRequests     *ebpf.MapSpec `ebpf:"ongoing_grpc_client_requests"`
 	OngoingGrpcHeaderWrites       *ebpf.MapSpec `ebpf:"ongoing_grpc_header_writes"`
@@ -327,6 +334,7 @@ type bpf_debugMaps struct {
 	KafkaRequests                 *ebpf.Map `ebpf:"kafka_requests"`
 	Newproc1                      *ebpf.Map `ebpf:"newproc1"`
 	OngoingClientConnections      *ebpf.Map `ebpf:"ongoing_client_connections"`
+	OngoingGoHttp                 *ebpf.Map `ebpf:"ongoing_go_http"`
 	OngoingGoroutines             *ebpf.Map `ebpf:"ongoing_goroutines"`
 	OngoingGrpcClientRequests     *ebpf.Map `ebpf:"ongoing_grpc_client_requests"`
 	OngoingGrpcHeaderWrites       *ebpf.Map `ebpf:"ongoing_grpc_header_writes"`
@@ -363,6 +371,7 @@ func (m *bpf_debugMaps) Close() error {
 		m.KafkaRequests,
 		m.Newproc1,
 		m.OngoingClientConnections,
+		m.OngoingGoHttp,
 		m.OngoingGoroutines,
 		m.OngoingGrpcClientRequests,
 		m.OngoingGrpcHeaderWrites,
@@ -413,7 +422,6 @@ type bpf_debugPrograms struct {
 	UprobeHttp2ServerOperateHeaders           *ebpf.Program `ebpf:"uprobe_http2Server_operateHeaders"`
 	UprobeHttp2serverConnRunHandler           *ebpf.Program `ebpf:"uprobe_http2serverConn_runHandler"`
 	UprobeNetFdRead                           *ebpf.Program `ebpf:"uprobe_netFdRead"`
-	UprobeNetFdReadGRPC                       *ebpf.Program `ebpf:"uprobe_netFdReadGRPC"`
 	UprobePersistConnRoundTrip                *ebpf.Program `ebpf:"uprobe_persistConnRoundTrip"`
 	UprobeProcGoexit1                         *ebpf.Program `ebpf:"uprobe_proc_goexit1"`
 	UprobeProcNewproc1                        *ebpf.Program `ebpf:"uprobe_proc_newproc1"`
@@ -469,7 +477,6 @@ func (p *bpf_debugPrograms) Close() error {
 		p.UprobeHttp2ServerOperateHeaders,
 		p.UprobeHttp2serverConnRunHandler,
 		p.UprobeNetFdRead,
-		p.UprobeNetFdReadGRPC,
 		p.UprobePersistConnRoundTrip,
 		p.UprobeProcGoexit1,
 		p.UprobeProcNewproc1,

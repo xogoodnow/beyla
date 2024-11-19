@@ -60,13 +60,12 @@ func RunBeyla(ctx context.Context, cfg *beyla.Config) error {
 
 func setupAppO11y(ctx context.Context, ctxInfo *global.ContextInfo, config *beyla.Config) error {
 	slog.Info("starting Beyla in Application Observability mode")
-	// TODO: when we split Beyla in two processes with different permissions, this code can be split:
-	// in two parts:
-	// 1st process (privileged) - Invoke FindTarget, which also mounts the BPF maps
-	// 2nd executable (unprivileged) - Invoke ReadAndForward, receiving the BPF map mountpoint as argument
+
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
 
 	instr := appolly.New(ctx, ctxInfo, config)
-	if err := instr.FindAndInstrument(); err != nil {
+	if err := instr.FindAndInstrument(&wg); err != nil {
 		return fmt.Errorf("can't find target process: %w", err)
 	}
 	if err := instr.ReadAndForward(); err != nil {
@@ -108,12 +107,12 @@ func buildCommonContextInfo(
 	ctxInfo := &global.ContextInfo{
 		Prometheus: promMgr,
 		K8sInformer: kube.NewMetadataProvider(kube.MetadataConfig{
-			Enable:                config.Attributes.Kubernetes.Enable,
-			EnableNetworkMetadata: config.Enabled(beyla.FeatureNetO11y),
-			KubeConfigPath:        config.Attributes.Kubernetes.KubeconfigPath,
-			SyncTimeout:           config.Attributes.Kubernetes.InformersSyncTimeout,
-			ResyncPeriod:          config.Attributes.Kubernetes.InformersResyncPeriod,
-			DisabledInformers:     config.Attributes.Kubernetes.DisableInformers,
+			Enable:            config.Attributes.Kubernetes.Enable,
+			KubeConfigPath:    config.Attributes.Kubernetes.KubeconfigPath,
+			SyncTimeout:       config.Attributes.Kubernetes.InformersSyncTimeout,
+			ResyncPeriod:      config.Attributes.Kubernetes.InformersResyncPeriod,
+			DisabledInformers: config.Attributes.Kubernetes.DisableInformers,
+			MetaCacheAddr:     config.Attributes.Kubernetes.MetaCacheAddress,
 		}),
 	}
 	switch {

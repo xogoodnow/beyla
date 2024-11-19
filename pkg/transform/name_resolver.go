@@ -2,6 +2,7 @@ package transform
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -11,10 +12,10 @@ import (
 
 	attr "github.com/grafana/beyla/pkg/export/attributes/names"
 	"github.com/grafana/beyla/pkg/internal/helpers/maps"
+	kube2 "github.com/grafana/beyla/pkg/internal/kube"
 	"github.com/grafana/beyla/pkg/internal/pipe/global"
 	"github.com/grafana/beyla/pkg/internal/request"
 	"github.com/grafana/beyla/pkg/internal/svc"
-	kube2 "github.com/grafana/beyla/pkg/internal/transform/kube"
 )
 
 const (
@@ -46,26 +47,44 @@ type NameResolverConfig struct {
 type NameResolver struct {
 	cache *expirable.LRU[string, string]
 	cfg   *NameResolverConfig
-	db    *kube2.Database
+	db    *kube2.Store
 
 	sources maps.Bits
 }
 
-func NameResolutionProvider(ctxInfo *global.ContextInfo, cfg *NameResolverConfig) pipe.MiddleProvider[[]request.Span, []request.Span] {
+func NameResolutionProvider(ctx context.Context, ctxInfo *global.ContextInfo, cfg *NameResolverConfig) pipe.MiddleProvider[[]request.Span, []request.Span] {
 	return func() (pipe.MiddleFunc[[]request.Span, []request.Span], error) {
 		if cfg == nil || len(cfg.Sources) == 0 {
 			return pipe.Bypass[[]request.Span](), nil
 		}
-		return nameResolver(ctxInfo, cfg)
+		return nameResolver(ctx, ctxInfo, cfg)
 	}
 }
 
-func nameResolver(ctxInfo *global.ContextInfo, cfg *NameResolverConfig) (pipe.MiddleFunc[[]request.Span, []request.Span], error) {
+func nameResolver(ctx context.Context, ctxInfo *global.ContextInfo, cfg *NameResolverConfig) (pipe.MiddleFunc[[]request.Span, []request.Span], error) {
+	sources := resolverSources(cfg.Sources)
+
+	var kubeStore *kube2.Store
+	if ctxInfo.K8sInformer.IsKubeEnabled() {
+		var err error
+		kubeStore, err = ctxInfo.K8sInformer.Get(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("initializing NameResolutionProvider: %w", err)
+		}
+	} else {
+		sources &= ^ResolverK8s
+	}
+	// after potentially remove k8s resolver, check again if
+	// this node needs to be bypassed
+	if sources == 0 {
+		return pipe.Bypass[[]request.Span](), nil
+	}
+
 	nr := NameResolver{
 		cfg:     cfg,
-		db:      ctxInfo.AppO11y.K8sDatabase,
+		db:      kubeStore,
 		cache:   expirable.NewLRU[string, string](cfg.CacheLen, nil, cfg.CacheTTL),
-		sources: resolverSources(cfg.Sources),
+		sources: sources,
 	}
 
 	return func(in <-chan []request.Span, out chan<- []request.Span) {
@@ -94,13 +113,16 @@ func trimPrefixIgnoreCase(s, prefix string) string {
 }
 
 func (nr *NameResolver) resolveNames(span *request.Span) {
-	var hn, pn string
+	var hn, pn, ns string
 	if span.IsClientSpan() {
 		hn, span.OtherNamespace = nr.resolve(&span.ServiceID, span.Host)
-		pn, _ = nr.resolve(&span.ServiceID, span.Peer)
+		pn, ns = nr.resolve(&span.ServiceID, span.Peer)
 	} else {
 		pn, span.OtherNamespace = nr.resolve(&span.ServiceID, span.Peer)
-		hn, _ = nr.resolve(&span.ServiceID, span.Host)
+		hn, ns = nr.resolve(&span.ServiceID, span.Host)
+	}
+	if span.ServiceID.Namespace == "" && ns != "" {
+		span.ServiceID.Namespace = ns
 	}
 	// don't set names if the peer and host names have been already decorated
 	// in a previous stage (e.g. Kubernetes decorator)

@@ -573,7 +573,7 @@ func TestGenerateTracesAttributes(t *testing.T) {
 		ensureTraceStrAttr(t, attrs, attribute.Key(attr.DBQueryText), "SELECT password FROM credentials WHERE username=\"bill\"")
 	})
 	t.Run("test Kafka trace generation", func(t *testing.T) {
-		span := request.Span{Type: request.EventTypeKafkaClient, Method: "process", Path: "important-topic", OtherNamespace: "test"}
+		span := request.Span{Type: request.EventTypeKafkaClient, Method: "process", Path: "important-topic", Statement: "test"}
 		traces := GenerateTraces(&span, "host-id", map[attr.Name]struct{}{}, []attribute.KeyValue{})
 
 		assert.Equal(t, 1, traces.ResourceSpans().Len())
@@ -754,6 +754,124 @@ func TestCodeToStatusCode(t *testing.T) {
 	})
 }
 
+func TestTracesConfig_Enabled(t *testing.T) {
+	assert.True(t, (&TracesConfig{CommonEndpoint: "foo"}).Enabled())
+	assert.True(t, (&TracesConfig{TracesEndpoint: "foo"}).Enabled())
+	assert.True(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"traces", "metrics"}, InstanceID: "33221"}}).Enabled())
+}
+
+func TestTracesConfig_Disabled(t *testing.T) {
+	assert.False(t, (&TracesConfig{}).Enabled())
+	assert.False(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"metrics"}, InstanceID: "33221"}}).Enabled())
+	assert.False(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"traces"}}}).Enabled())
+}
+
+func TestSpanHostPeer(t *testing.T) {
+	sp := request.Span{
+		HostName: "localhost",
+		Host:     "127.0.0.1",
+		PeerName: "peerhost",
+		Peer:     "127.0.0.2",
+	}
+
+	assert.Equal(t, "localhost", request.SpanHost(&sp))
+	assert.Equal(t, "peerhost", request.SpanPeer(&sp))
+
+	sp = request.Span{
+		Host: "127.0.0.1",
+		Peer: "127.0.0.2",
+	}
+
+	assert.Equal(t, "127.0.0.1", request.SpanHost(&sp))
+	assert.Equal(t, "127.0.0.2", request.SpanPeer(&sp))
+
+	sp = request.Span{}
+
+	assert.Equal(t, "", request.SpanHost(&sp))
+	assert.Equal(t, "", request.SpanPeer(&sp))
+}
+
+func TestTracesInstrumentations(t *testing.T) {
+	tests := []InstrTest{
+		{
+			name:     "all instrumentations",
+			instr:    []string{instrumentations.InstrumentationALL},
+			expected: []string{"GET /foo", "PUT /bar", "/grpcFoo", "/grpcGoo", "SELECT credentials", "SET", "GET", "important-topic publish", "important-topic process"},
+		},
+		{
+			name:     "http only",
+			instr:    []string{instrumentations.InstrumentationHTTP},
+			expected: []string{"GET /foo", "PUT /bar"},
+		},
+		{
+			name:     "grpc only",
+			instr:    []string{instrumentations.InstrumentationGRPC},
+			expected: []string{"/grpcFoo", "/grpcGoo"},
+		},
+		{
+			name:     "redis only",
+			instr:    []string{instrumentations.InstrumentationRedis},
+			expected: []string{"SET", "GET"},
+		},
+		{
+			name:     "sql only",
+			instr:    []string{instrumentations.InstrumentationSQL},
+			expected: []string{"SELECT credentials"},
+		},
+		{
+			name:     "kafka only",
+			instr:    []string{instrumentations.InstrumentationKafka},
+			expected: []string{"important-topic publish", "important-topic process"},
+		},
+		{
+			name:     "none",
+			instr:    nil,
+			expected: []string{},
+		},
+		{
+			name:     "sql and redis",
+			instr:    []string{instrumentations.InstrumentationSQL, instrumentations.InstrumentationRedis},
+			expected: []string{"SELECT credentials", "SET", "GET"},
+		},
+		{
+			name:     "kafka and grpc",
+			instr:    []string{instrumentations.InstrumentationGRPC, instrumentations.InstrumentationKafka},
+			expected: []string{"/grpcFoo", "/grpcGoo", "important-topic publish", "important-topic process"},
+		},
+	}
+
+	spans := []request.Span{
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeHTTP, Method: "GET", Route: "/foo", RequestStart: 100, End: 200},
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeHTTPClient, Method: "PUT", Route: "/bar", RequestStart: 150, End: 175},
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeGRPC, Path: "/grpcFoo", RequestStart: 100, End: 200},
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeGRPCClient, Path: "/grpcGoo", RequestStart: 150, End: 175},
+		makeSQLRequestSpan("SELECT password FROM credentials WHERE username=\"bill\""),
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeRedisClient, Method: "SET", Path: "redis_db", RequestStart: 150, End: 175},
+		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeRedisServer, Method: "GET", Path: "redis_db", RequestStart: 150, End: 175},
+		{Type: request.EventTypeKafkaClient, Method: "process", Path: "important-topic", Statement: "test"},
+		{Type: request.EventTypeKafkaServer, Method: "publish", Path: "important-topic", Statement: "test"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := makeTracesTestReceiver(tt.instr)
+			traces := generateTracesForSpans(t, tr, spans)
+			assert.Equal(t, len(traces), len(tt.expected), tt.name)
+			for i := 0; i < len(tt.expected); i++ {
+				found := false
+				for j := 0; j < len(traces); j++ {
+					assert.Equal(t, traces[j].ResourceSpans().Len(), 1, tt.name+":"+tt.expected[i])
+					if traces[j].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).Name() == tt.expected[i] {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, tt.name+":"+tt.expected[i])
+			}
+		})
+	}
+}
+
 func TestTraces_InternalInstrumentation(t *testing.T) {
 	defer restoreEnvAfterExecution()()
 	// fake OTEL collector server
@@ -849,187 +967,6 @@ func TestTraces_InternalInstrumentation(t *testing.T) {
 		assert.Equal(t, previousCount, count)
 		assert.Less(t, previousErrCount, internalTraces.Errors())
 	})
-}
-
-func TestTraces_InternalInstrumentationSampling(t *testing.T) {
-	defer restoreEnvAfterExecution()()
-	// fake OTEL collector server
-	coll := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer coll.Close()
-	// Wait for the HTTP server to be alive
-	test.Eventually(t, timeout, func(t require.TestingT) {
-		resp, err := coll.Client().Get(coll.URL + "/foo")
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-	})
-
-	builder := pipe.NewBuilder(&testPipeline{})
-	// create a simple dummy graph to send data to the Metrics reporter, which will send
-	// metrics to the fake collector
-	sendData := make(chan struct{})
-	pipe.AddStart(builder, func(impl *testPipeline) *pipe.Start[[]request.Span] {
-		return &impl.inputNode
-	}, func(out chan<- []request.Span) { // on every send data signal, the traces generator sends a dummy trace
-		for range sendData {
-			out <- []request.Span{{Type: request.EventTypeHTTP}}
-		}
-	})
-	internalTraces := &fakeInternalTraces{}
-	pipe.AddFinalProvider(builder, func(impl *testPipeline) *pipe.Final[[]request.Span] {
-		return &impl.exporter
-	}, TracesReceiver(context.Background(),
-		TracesConfig{
-			CommonEndpoint:    coll.URL,
-			BatchTimeout:      10 * time.Millisecond,
-			ExportTimeout:     5 * time.Second,
-			Sampler:           Sampler{Name: "always_off"}, // we won't send any trace
-			ReportersCacheLen: 16,
-			Instrumentations:  []string{instrumentations.InstrumentationALL},
-		},
-		&global.ContextInfo{
-			Metrics: internalTraces,
-		},
-		attributes.Selection{},
-	))
-
-	graph, err := builder.Build()
-	require.NoError(t, err)
-
-	graph.Start()
-
-	// Let's make 10 traces, none should be seen
-	for i := 0; i < 10; i++ {
-		sendData <- struct{}{}
-	}
-	var previousSum, previousCount int
-	test.Eventually(t, timeout, func(t require.TestingT) {
-		// we shouldn't see any data
-		previousSum, previousCount = internalTraces.SumCount()
-		assert.Equal(t, 0, previousSum)
-		assert.Equal(t, 0, previousCount)
-		// no call should return error
-		assert.Empty(t, internalTraces.Errors())
-	})
-}
-
-func TestTracesConfig_Enabled(t *testing.T) {
-	assert.True(t, (&TracesConfig{CommonEndpoint: "foo"}).Enabled())
-	assert.True(t, (&TracesConfig{TracesEndpoint: "foo"}).Enabled())
-	assert.True(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"traces", "metrics"}, InstanceID: "33221"}}).Enabled())
-}
-
-func TestTracesConfig_Disabled(t *testing.T) {
-	assert.False(t, (&TracesConfig{}).Enabled())
-	assert.False(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"metrics"}, InstanceID: "33221"}}).Enabled())
-	assert.False(t, (&TracesConfig{Grafana: &GrafanaOTLP{Submit: []string{"traces"}}}).Enabled())
-}
-
-func TestSpanHostPeer(t *testing.T) {
-	sp := request.Span{
-		HostName: "localhost",
-		Host:     "127.0.0.1",
-		PeerName: "peerhost",
-		Peer:     "127.0.0.2",
-	}
-
-	assert.Equal(t, "localhost", request.SpanHost(&sp))
-	assert.Equal(t, "peerhost", request.SpanPeer(&sp))
-
-	sp = request.Span{
-		Host: "127.0.0.1",
-		Peer: "127.0.0.2",
-	}
-
-	assert.Equal(t, "127.0.0.1", request.SpanHost(&sp))
-	assert.Equal(t, "127.0.0.2", request.SpanPeer(&sp))
-
-	sp = request.Span{}
-
-	assert.Equal(t, "", request.SpanHost(&sp))
-	assert.Equal(t, "", request.SpanPeer(&sp))
-}
-
-func TestTracesInstrumentations(t *testing.T) {
-	tests := []InstrTest{
-		{
-			name:     "all instrumentations",
-			instr:    []string{instrumentations.InstrumentationALL},
-			expected: []string{"GET /foo", "PUT /bar", "/grpcFoo", "/grpcGoo", "SELECT credentials", "SET", "GET", "important-topic publish", "important-topic process"},
-		},
-		{
-			name:     "http only",
-			instr:    []string{instrumentations.InstrumentationHTTP},
-			expected: []string{"GET /foo", "PUT /bar"},
-		},
-		{
-			name:     "grpc only",
-			instr:    []string{instrumentations.InstrumentationGRPC},
-			expected: []string{"/grpcFoo", "/grpcGoo"},
-		},
-		{
-			name:     "redis only",
-			instr:    []string{instrumentations.InstrumentationRedis},
-			expected: []string{"SET", "GET"},
-		},
-		{
-			name:     "sql only",
-			instr:    []string{instrumentations.InstrumentationSQL},
-			expected: []string{"SELECT credentials"},
-		},
-		{
-			name:     "kafka only",
-			instr:    []string{instrumentations.InstrumentationKafka},
-			expected: []string{"important-topic publish", "important-topic process"},
-		},
-		{
-			name:     "none",
-			instr:    nil,
-			expected: []string{},
-		},
-		{
-			name:     "sql and redis",
-			instr:    []string{instrumentations.InstrumentationSQL, instrumentations.InstrumentationRedis},
-			expected: []string{"SELECT credentials", "SET", "GET"},
-		},
-		{
-			name:     "kafka and grpc",
-			instr:    []string{instrumentations.InstrumentationGRPC, instrumentations.InstrumentationKafka},
-			expected: []string{"/grpcFoo", "/grpcGoo", "important-topic publish", "important-topic process"},
-		},
-	}
-
-	spans := []request.Span{
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeHTTP, Method: "GET", Route: "/foo", RequestStart: 100, End: 200},
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeHTTPClient, Method: "PUT", Route: "/bar", RequestStart: 150, End: 175},
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeGRPC, Path: "/grpcFoo", RequestStart: 100, End: 200},
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeGRPCClient, Path: "/grpcGoo", RequestStart: 150, End: 175},
-		makeSQLRequestSpan("SELECT password FROM credentials WHERE username=\"bill\""),
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeRedisClient, Method: "SET", Path: "redis_db", RequestStart: 150, End: 175},
-		{ServiceID: svc.ID{UID: "foo"}, Type: request.EventTypeRedisServer, Method: "GET", Path: "redis_db", RequestStart: 150, End: 175},
-		{Type: request.EventTypeKafkaClient, Method: "process", Path: "important-topic", OtherNamespace: "test"},
-		{Type: request.EventTypeKafkaServer, Method: "publish", Path: "important-topic", OtherNamespace: "test"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tr := makeTracesTestReceiver(tt.instr)
-			traces := generateTracesForSpans(t, tr, spans)
-			assert.Equal(t, len(traces), len(tt.expected), tt.name)
-			for i := 0; i < len(tt.expected); i++ {
-				found := false
-				for j := 0; j < len(traces); j++ {
-					assert.Equal(t, traces[j].ResourceSpans().Len(), 1, tt.name+":"+tt.expected[i])
-					if traces[j].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).Name() == tt.expected[i] {
-						found = true
-						break
-					}
-				}
-				assert.True(t, found, tt.name+":"+tt.expected[i])
-			}
-		})
-	}
 }
 
 func TestTracesAttrReuse(t *testing.T) {
@@ -1261,6 +1198,133 @@ func TestTraces_GRPCStatus(t *testing.T) {
 			assert.Equal(t, p.statusCode, request.SpanStatusCode(&request.Span{Status: int(p.grpcCode.Value.AsInt64()), Type: request.EventTypeGRPCClient}))
 		}
 	})
+}
+
+func TestHostPeerAttributes(t *testing.T) {
+	// Metrics
+	tests := []struct {
+		name   string
+		span   request.Span
+		client string
+		server string
+	}{
+		{
+			name:   "Same namespaces HTTP",
+			span:   request.Span{Type: request.EventTypeHTTP, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server",
+		},
+		{
+			name:   "Client in different namespace",
+			span:   request.Span{Type: request.EventTypeHTTP, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client.far",
+			server: "server",
+		},
+		{
+			name:   "Same namespaces for HTTP client",
+			span:   request.Span{Type: request.EventTypeHTTPClient, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server",
+		},
+		{
+			name:   "Server in different namespace ",
+			span:   request.Span{Type: request.EventTypeHTTPClient, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server.far",
+		},
+		{
+			name:   "Same namespaces GRPC",
+			span:   request.Span{Type: request.EventTypeGRPC, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server",
+		},
+		{
+			name:   "Client in different namespace GRPC",
+			span:   request.Span{Type: request.EventTypeGRPC, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client.far",
+			server: "server",
+		},
+		{
+			name:   "Same namespaces for GRPC client",
+			span:   request.Span{Type: request.EventTypeGRPCClient, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server",
+		},
+		{
+			name:   "Server in different namespace GRPC",
+			span:   request.Span{Type: request.EventTypeGRPCClient, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "client",
+			server: "server.far",
+		},
+		{
+			name:   "Same namespaces for SQL client",
+			span:   request.Span{Type: request.EventTypeSQLClient, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server",
+		},
+		{
+			name:   "Server in different namespace SQL",
+			span:   request.Span{Type: request.EventTypeSQLClient, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server.far",
+		},
+		{
+			name:   "Same namespaces for Redis client",
+			span:   request.Span{Type: request.EventTypeRedisClient, PeerName: "client", HostName: "server", OtherNamespace: "same", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server",
+		},
+		{
+			name:   "Server in different namespace Redis",
+			span:   request.Span{Type: request.EventTypeRedisClient, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server.far",
+		},
+		{
+			name:   "Client in different namespace Redis",
+			span:   request.Span{Type: request.EventTypeRedisServer, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server",
+		},
+		{
+			name:   "Server in different namespace Kafka",
+			span:   request.Span{Type: request.EventTypeKafkaClient, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server.far",
+		},
+		{
+			name:   "Client in different namespace Kafka",
+			span:   request.Span{Type: request.EventTypeKafkaServer, PeerName: "client", HostName: "server", OtherNamespace: "far", ServiceID: svc.ID{Namespace: "same"}},
+			client: "",
+			server: "server",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attrs := traceAttributes(&tt.span, nil)
+			if tt.server != "" {
+				var found attribute.KeyValue
+				for _, a := range attrs {
+					if a.Key == attribute.Key(attr.ServerAddr) {
+						found = a
+						assert.Equal(t, tt.server, a.Value.AsString())
+					}
+				}
+				assert.NotNil(t, found)
+			}
+			if tt.client != "" {
+				var found attribute.KeyValue
+				for _, a := range attrs {
+					if a.Key == attribute.Key(attr.ClientAddr) {
+						found = a
+						assert.Equal(t, tt.client, a.Value.AsString())
+					}
+				}
+				assert.NotNil(t, found)
+			}
+		})
+	}
 }
 
 func makeSQLRequestSpan(sql string) request.Span {

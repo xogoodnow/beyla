@@ -5,10 +5,11 @@
 #include "bpf_helpers.h"
 #include "http_types.h"
 #include "ringbuf.h"
-#include "pid.h"
 #include "runtime.h"
 #include "protocol_common.h"
 #include "trace_common.h"
+#include "pin_internal.h"
+#include "http_maps.h"
 
 volatile const u32 high_request_volume;
 
@@ -20,23 +21,6 @@ struct {
     __type(value, http_info_t);
     __uint(max_entries, 1);
 } http_info_mem SEC(".maps");
-
-// Keeps track of the ongoing http connections we match for request/response
-struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
-    __type(key, pid_connection_info_t);
-    __type(value, http_info_t);
-    __uint(max_entries, MAX_CONCURRENT_SHARED_REQUESTS);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
-} ongoing_http SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
-    __type(key, connection_info_t);
-    __type(value, http_info_t);
-    __uint(max_entries, 1024);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
-} ongoing_http_fallback SEC(".maps");
 
 // empty_http_info zeroes and return the unique percpu copy in the map
 // this function assumes that a given thread is not trying to use many
@@ -59,21 +43,7 @@ static __always_inline u8 is_http(const unsigned char *p, u32 len, u8 *packet_ty
         (p[5] == '1') && (p[6] == '.')) {
         *packet_type = PACKET_TYPE_RESPONSE;
         return 1;
-    } else if (((p[0] == 'G') && (p[1] == 'E') && (p[2] == 'T') && (p[3] == ' ') &&
-                (p[4] == '/')) || // GET
-               ((p[0] == 'P') && (p[1] == 'O') && (p[2] == 'S') && (p[3] == 'T') && (p[4] == ' ') &&
-                (p[5] == '/')) || // POST
-               ((p[0] == 'P') && (p[1] == 'U') && (p[2] == 'T') && (p[3] == ' ') &&
-                (p[4] == '/')) || // PUT
-               ((p[0] == 'P') && (p[1] == 'A') && (p[2] == 'T') && (p[3] == 'C') && (p[4] == 'H') &&
-                (p[5] == ' ') && (p[6] == '/')) || // PATCH
-               ((p[0] == 'D') && (p[1] == 'E') && (p[2] == 'L') && (p[3] == 'E') && (p[4] == 'T') &&
-                (p[5] == 'E') && (p[6] == ' ') && (p[7] == '/')) || // DELETE
-               ((p[0] == 'H') && (p[1] == 'E') && (p[2] == 'A') && (p[3] == 'D') && (p[4] == ' ') &&
-                (p[5] == '/')) || // HEAD
-               ((p[0] == 'O') && (p[1] == 'P') && (p[2] == 'T') && (p[3] == 'I') && (p[4] == 'O') &&
-                (p[5] == 'N') && (p[6] == 'S') && (p[7] == ' ') && (p[8] == '/')) // OPTIONS
-    ) {
+    } else if (is_http_request_buf(p)) {
         *packet_type = PACKET_TYPE_REQUEST;
         return 1;
     }
@@ -228,10 +198,7 @@ static __always_inline void handle_http_response(unsigned char *small_buf,
         t_key.p_key.pid = info->task_tid;
         delete_server_trace(&t_key);
     } else {
-        //bpf_dbg_printk("Deleting client trace map for connection");
-        //dbg_print_http_connection_info(&pid_conn->conn);
-
-        bpf_map_delete_elem(&trace_map, &pid_conn->conn);
+        delete_client_trace_info(pid_conn);
     }
     bpf_map_delete_elem(&active_ssl_connections, pid_conn);
 }
