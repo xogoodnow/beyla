@@ -652,7 +652,7 @@ func testHTTP2GRPCTracesNestedCalls(t *testing.T, contextPropagation bool) {
 	)
 	assert.Empty(t, sd, sd.String())
 
-	res = trace.FindByOperationName("/routeguide.RouteGuide/GetFeature", "client")
+	res = trace.FindByOperationName("/routeguide.RouteGuide/GetFeature", "")
 	require.Len(t, res, numNested)
 	for index := range res {
 		grpc := res[index]

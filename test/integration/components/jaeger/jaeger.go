@@ -65,7 +65,7 @@ func (t *Trace) FindByOperationName(operationName string, spanType string) []Spa
 	for _, s := range t.Spans {
 		if s.OperationName == operationName {
 			tag, _ := FindIn(s.Tags, "span.kind")
-			if tag.Value == spanType {
+			if spanType == "" || spanType == tag.Value {
 				matches = append(matches, s)
 			}
 		}
