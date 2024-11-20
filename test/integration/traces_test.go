@@ -94,7 +94,7 @@ func testHTTPTracesCommon(t *testing.T, doTraceID bool, httpCode int) {
 	}
 
 	// Check the information of the "in queue" span
-	res = trace.FindByOperationName("in queue", "server")
+	res = trace.FindByOperationName("in queue", "internal")
 	require.Len(t, res, 1)
 	queue := res[0]
 	// Check parenthood
@@ -115,7 +115,7 @@ func testHTTPTracesCommon(t *testing.T, doTraceID bool, httpCode int) {
 	assert.Empty(t, sd, sd.String())
 
 	// Check the information of the "processing" span
-	res = trace.FindByOperationName("processing", "server")
+	res = trace.FindByOperationName("processing", "internal")
 	require.Len(t, res, 1)
 	processing := res[0]
 	// Check parenthood
@@ -205,7 +205,7 @@ func testGRPCTracesForServiceName(t *testing.T, svcName string) {
 	assert.Empty(t, sd, sd.String())
 
 	// Check the information of the "in queue" span
-	res = trace.FindByOperationName("in queue", "server")
+	res = trace.FindByOperationName("in queue", "internal")
 	require.Len(t, res, 1)
 	queue := res[0]
 	// Check parenthood
@@ -467,7 +467,7 @@ func testHTTPTracesNestedCalls(t *testing.T, contextPropagation bool) {
 	}
 
 	// Check the information of the "in queue" span
-	res = trace.FindByOperationName("in queue", "server")
+	res = trace.FindByOperationName("in queue", "internal")
 	require.Equal(t, len(res), numNested)
 
 	var queue *jaeger.Span
