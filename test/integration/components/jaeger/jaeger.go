@@ -63,7 +63,7 @@ func (tq *TracesQuery) FindBySpan(tags ...Tag) []Trace {
 func (t *Trace) FindByOperationName(operationName string, spanType string) []Span {
 	var matches []Span
 	for _, s := range t.Spans {
-		if s.OperationName == operationName {
+		if strings.Contains(s.OperationName, operationName) {
 			tag, _ := FindIn(s.Tags, "span.kind")
 			if spanType == "" || spanType == tag.Value {
 				matches = append(matches, s)
