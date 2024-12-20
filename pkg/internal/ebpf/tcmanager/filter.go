@@ -33,7 +33,7 @@ type InterfaceFilter struct {
 	allowedMatches   []string
 	excludedRegexpes []*regexp.Regexp
 	excludedMatches  []string
-	isRegexp *regexp.Regexp
+	isRegexp         *regexp.Regexp
 }
 
 func NewInterfaceFilter(allowed []string, excluded []string) (*InterfaceFilter, error) {
@@ -66,9 +66,9 @@ func (itf *InterfaceFilter) Deny(pattern string) error {
 }
 
 func (itf *InterfaceFilter) addPattern(pattern string,
-		regexps *[]*regexp.Regexp, matches *[]string) error {
+	regexps *[]*regexp.Regexp, matches *[]string) error {
 	if regexps == nil || matches == nil {
-		return fmt.Errorf("Logic error: addPattern has null params")
+		return fmt.Errorf("logic error: addPattern has null params")
 	}
 
 	pattern = strings.Trim(pattern, " ")
